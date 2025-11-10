@@ -1,4 +1,5 @@
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
+const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFOKpdZMMO9sPcpWH6mrQW2S-eaxu-8B6YTZ4ZM93WgbAXuDG8-9nkrO3D644WmxAqHGdm07FGkh7H/pub?gid=137620678&single=true&output=csv';
 
 let levels = [];
 let currentLevel = 0;
@@ -6,13 +7,14 @@ let timeLeft = 0;
 let timerInterval = null;
 let running = false;
 let structureTitle = "Poker Clock";
+let selectedPlayersIndexes = [];
 
 // Font-size base et ratios
-let baseFontSize = 6; // en em
+let baseFontSize = 10; // en em
 const fontRatios = {
   level: 0.5,
-  timer: 1.5,
-  blinds: 1,
+  timer: 1,
+  blinds: 1.5,
   nextLevel: 0.3,
   nextBreak: 0.3
 };
@@ -109,6 +111,63 @@ async function loadStructure() {
     renderStructureTable();
   } catch (e) {
     document.getElementById('loading').textContent = 'Erreur de chargement : ' + e.message;
+  }
+}
+
+async function loadPlayers() {
+  try {
+    const response = await fetch(PLAYERS_CSV_URL);
+    if (!response.ok) throw new Error('Erreur de chargement du CSV joueurs');
+    const csvText = await response.text();
+    const lines = csvText.trim().split('\n');
+    // On ignore les 4 premières lignes
+    const data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
+
+    // Génère le tableau HTML
+    let html = '<table id="players-table"><thead><tr>';
+    html += '<th></th><th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th>';
+    html += '</tr></thead><tbody>';
+    data.forEach((row, idx) => {
+      if (row.length >= 7) {
+        const checked = selectedPlayersIndexes.includes(idx) ? 'checked' : '';
+        html += `<tr>
+          <td><input type="checkbox" class="player-checkbox" data-index="${idx}" ${checked}></td>
+          <td>${row[0]}</td>
+          <td>${row[1]}</td>
+          <td>${row[5]}</td>
+          <td>${row[6]}</td>
+        </tr>`;
+      }
+    });
+    html += '</tbody></table>';
+
+    document.getElementById('tab-joueurs').innerHTML = html;
+
+    // Met à jour la sélection à chaque changement de case
+    document.querySelectorAll('.player-checkbox').forEach(cb => {
+      cb.addEventListener('change', function() {
+        const idx = parseInt(this.getAttribute('data-index'));
+        if (this.checked) {
+          if (!selectedPlayersIndexes.includes(idx)) selectedPlayersIndexes.push(idx);
+        } else {
+          selectedPlayersIndexes = selectedPlayersIndexes.filter(i => i !== idx);
+        }
+      });
+    });
+
+    // Ajoute le comportement de clic sur la ligne pour cocher/décocher
+    document.querySelectorAll('#players-table tbody tr').forEach(tr => {
+      tr.addEventListener('click', function(e) {
+        if (e.target.type === 'checkbox') return;
+        const checkbox = this.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('tab-joueurs').innerHTML = '<p style="color:red;">Erreur de chargement des joueurs : ' + e.message + '</p>';
   }
 }
 
@@ -227,12 +286,14 @@ function resetTimer() {
   updateDisplay();
 }
 
-// Onglets
 function showTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(tabDiv => tabDiv.classList.remove('active'));
   document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'joueurs') {
+    loadPlayers();
+  }
 }
 
 // Génère le tableau de structure complète
@@ -290,3 +351,68 @@ document.getElementById('edit-title-btn').addEventListener('click', function() {
   // Désactive le bouton pendant l'édition
   document.getElementById('edit-title-btn').disabled = true;
 });
+
+function generateTablePlan() {
+  // Récupère les joueurs cochés selon selectedPlayersIndexes
+  const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
+  const checkedRows = rows.filter((tr, idx) => selectedPlayersIndexes.includes(idx));
+
+  if (checkedRows.length === 0) {
+    document.getElementById('tables-plan').innerHTML = '<p style="color:red;">Aucun joueur sélectionné.</p>';
+    return;
+  }
+
+  // Récupère les infos des joueurs cochés
+  const players = checkedRows.map(tr => {
+    const tds = tr.querySelectorAll('td');
+    return {
+      nom: tds[1].textContent,
+      prenom: tds[2].textContent,
+      mpla: tds[3].textContent,
+      winamax: tds[4].textContent
+    };
+  });
+
+  // Mélange aléatoirement les joueurs (Fisher-Yates)
+  for (let i = players.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [players[i], players[j]] = [players[j], players[i]];
+  }
+
+  // Récupère le nombre de joueurs par table
+  const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+  const nbTables = Math.ceil(players.length / perTable);
+
+  // Répartition équilibrée
+  let tables = Array.from({length: nbTables}, () => []);
+  players.forEach((player, i) => {
+    tables[i % nbTables].push(player);
+  });
+
+  // Génération du HTML graphique
+  let html = '<div class="table-graphic-container">';
+  for (let t = 0; t < nbTables; t++) {
+    const tablePlayers = tables[t];
+    const n = tablePlayers.length;
+    html += `<div class="table-graphic">
+      <div class="table-graphic-title">Table ${t + 1}</div>
+      <div class="seats-circle">`;
+
+    // Disposition circulaire des sièges
+    const radius = 110;
+    const centerX = 130, centerY = 130;
+    tablePlayers.forEach((p, s) => {
+      const angle = (2 * Math.PI * s) / n - Math.PI / 2;
+      const x = centerX + radius * Math.cos(angle) - 45; // 45 = seat width / 2
+      const y = centerY + radius * Math.sin(angle) - 25; // 25 = seat height / 2
+      html += `<div class="seat" style="left:${x}px;top:${y}px;">
+      <div class="seat-number">Siège ${s + 1}</div>
+      <div style="font-size:1.1em; font-weight:bold;">${p.winamax || '-'}</div>
+    </div>`;
+    });
+
+    html += `</div></div>`;
+  }
+  html += '</div>';
+  document.getElementById('tables-plan').innerHTML = html;
+}
