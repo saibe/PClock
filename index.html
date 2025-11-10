@@ -7,21 +7,39 @@
 </head>
 <body>
   <div class="container">
+    <div id="datetime" class="datetime"></div>
     <div class="title">
-      <h1 id="structure-title">En gras les valeurs modifiables  Structure Tournoi</h1>
+      <h1 id="structure-title" style="display:inline;">Structure Tournoi</h1>
+      <button id="edit-title-btn" title="Modifier le titre" style="margin-left:0.5em; font-size:1em; vertical-align:middle; cursor:pointer;">✏️</button>
     </div>
-    <div id="level" style="margin-bottom:0.5em;">Niveau 4</div>
-    <div id="timer">18:00</div>
-    <div id="blinds-info">200 / 400</div>
-    <div id="next-level-info"></div>
-    <div id="next-break-info"></div>
-    <div class="controls">
-      <button onclick="prevLevel()">⏮️ Précédent</button>
-      <button onclick="toggleTimer()" id="startStopBtn">▶️ Démarrer</button>
-      <button onclick="nextLevel()">⏭️ Suivant</button>
-      <button onclick="resetTimer()">🔄 Réinitialiser</button>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('tournoi')">Tournoi</button>
+      <button class="tab-btn" onclick="showTab('structure')">Structure</button>
+      <button class="tab-btn" onclick="showTab('joueurs')">Joueurs</button>
     </div>
-    <div id="loading" style="margin-top: 1em; color: #aaa; display: none;">Chargement de la structure...</div>
+
+    <div id="tab-tournoi" class="tab-content active">
+      <div id="level" style="margin-bottom:0.5em;">Niveau 1</div>
+      <div id="timer">--:--</div>
+      <div id="blinds-info">-</div>
+      <div id="next-level-info"></div>
+      <div id="next-break-info"></div>
+      <div class="controls">
+        <button onclick="prevLevel()">⏮️ Précédent</button>
+        <button onclick="toggleTimer()" id="startStopBtn">▶️ Démarrer</button>
+        <button onclick="nextLevel()">⏭️ Suivant</button>
+        <button onclick="resetTimer()">🔄 Réinitialiser</button>
+      </div>
+      <div id="loading" style="margin-top: 1em; color: #aaa; display: none;">Chargement de la structure...</div>
+    </div>
+
+    <div id="tab-structure" class="tab-content">
+      <div id="structure-table-container"></div>
+    </div>
+
+    <div id="tab-joueurs" class="tab-content">
+      <p>Gestion des joueurs à venir…</p>
+    </div>
   </div>
   <script src="script.js"></script>
 </body>

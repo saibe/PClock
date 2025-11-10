@@ -7,6 +7,49 @@ let timerInterval = null;
 let running = false;
 let structureTitle = "Poker Clock";
 
+// Font-size base et ratios
+let baseFontSize = 6; // en em
+const fontRatios = {
+  level: 0.5,
+  timer: 1.5,
+  blinds: 1,
+  nextLevel: 0.3,
+  nextBreak: 0.3
+};
+
+function applyFontSizes() {
+  document.getElementById('level').style.fontSize = (baseFontSize * fontRatios.level) + 'em';
+  document.getElementById('timer').style.fontSize = (baseFontSize * fontRatios.timer) + 'em';
+  document.getElementById('blinds-info').style.fontSize = (baseFontSize * fontRatios.blinds) + 'em';
+  document.getElementById('next-level-info').style.fontSize = (baseFontSize * fontRatios.nextLevel) + 'em';
+  document.getElementById('next-break-info').style.fontSize = (baseFontSize * fontRatios.nextBreak) + 'em';
+}
+applyFontSizes();
+
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'PageUp') {
+    baseFontSize += 1;
+    applyFontSizes();
+    e.preventDefault();
+  }
+  if (e.code === 'PageDown') {
+    baseFontSize = Math.max(1, baseFontSize - 1);
+    applyFontSizes();
+    e.preventDefault();
+  }
+});
+
+// Date et heure en haut
+function updateDateTime() {
+  const now = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const dateStr = now.toLocaleDateString('fr-FR', options);
+  const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  document.getElementById('datetime').textContent = dateStr + ' – ' + timeStr;
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   // On prend la première ligne comme titre
@@ -25,7 +68,6 @@ async function loadStructure() {
 
     document.getElementById('structure-title').textContent = structureTitle;
 
-    // data[0] = en-têtes, data[1...] = données
     levels = [];
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
@@ -36,7 +78,7 @@ async function loadStructure() {
       const ante = row[6];
       const breakDuration = row[7];
 
-      // 1. Ajoute le niveau si présent
+      // Ajoute le niveau si présent
       if (levelNum && roundDuration && sb && bb) {
         levels.push({
           label: `Niveau ${levelNum}`,
@@ -46,8 +88,7 @@ async function loadStructure() {
           isPause: false
         });
       }
-
-      // 2. Ajoute le break si présent
+      // Ajoute le break si présent
       if (breakDuration && parseInt(breakDuration) > 0) {
         levels.push({
           label: `Pause`,
@@ -65,6 +106,7 @@ async function loadStructure() {
     timeLeft = levels[0].duration;
     document.getElementById('loading').style.display = 'none';
     updateDisplay();
+    renderStructureTable();
   } catch (e) {
     document.getElementById('loading').textContent = 'Erreur de chargement : ' + e.message;
   }
@@ -185,4 +227,66 @@ function resetTimer() {
   updateDisplay();
 }
 
+// Onglets
+function showTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(tabDiv => tabDiv.classList.remove('active'));
+  document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// Génère le tableau de structure complète
+function renderStructureTable() {
+  if (!levels || levels.length === 0) return;
+  let html = '<table id="structure-table"><thead><tr><th>#</th><th>Type</th><th>Blinds</th><th>Ante</th><th>Durée</th></tr></thead><tbody>';
+  levels.forEach((lvl, idx) => {
+    if (lvl.isPause) {
+      html += `<tr class="pause-row"><td>${idx + 1}</td><td>Pause</td><td colspan="2"></td><td>${formatTime(lvl.duration)}</td></tr>`;
+    } else {
+      html += `<tr><td>${idx + 1}</td><td>${lvl.label}</td><td>${lvl.blinds}</td><td>${lvl.ante || '-'}</td><td>${formatTime(lvl.duration)}</td></tr>`;
+    }
+  });
+  html += '</tbody></table>';
+  document.getElementById('structure-table-container').innerHTML = html;
+}
+
 loadStructure();
+
+// Edition du titre
+document.getElementById('edit-title-btn').addEventListener('click', function() {
+  const titleElem = document.getElementById('structure-title');
+  const currentTitle = titleElem.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentTitle;
+  input.style.fontSize = '1.2em';
+  input.style.textAlign = 'center';
+  input.style.width = '70%';
+
+  // Remplace le titre par l'input
+  titleElem.replaceWith(input);
+  input.focus();
+
+  // Fonction pour valider la modification
+  function saveTitle() {
+    const newTitle = input.value.trim() || 'Structure Tournoi';
+    const newTitleElem = document.createElement('h1');
+    newTitleElem.id = 'structure-title';
+    newTitleElem.style.display = 'inline';
+    newTitleElem.textContent = newTitle;
+    input.replaceWith(newTitleElem);
+    // Remettre l'écouteur sur le nouveau h1
+    document.getElementById('edit-title-btn').disabled = false;
+  }
+
+  // Valide au blur ou sur Entrée
+  input.addEventListener('blur', saveTitle);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      input.blur();
+    }
+  });
+
+  // Désactive le bouton pendant l'édition
+  document.getElementById('edit-title-btn').disabled = true;
+});
