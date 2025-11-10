@@ -93,12 +93,7 @@ body {
 #blinds-info.pause {
   background: darkred;
   color: #fff;
-  border-radius: 0.2em;
-  padding: 0.2em 0.5em;
   font-weight: bold;
-  font-size: 2em;
-  letter-spacing: 0.1em;
-  margin: 0.5em 0 1em 0;
 }
 #next-level-info {
   margin: 0.5em 0 0.2em 0;
@@ -196,7 +191,7 @@ body {
   box-shadow: 0 0 16px #000a;
   padding: 2em 2em 2.5em 2em;
   min-width: 320px;
-  min-height: 320px;
+  min-height: 560px;
   position: relative;
   margin-bottom: 2em;
   display: flex;
@@ -213,7 +208,7 @@ body {
 .seats-circle {
   position: relative;
   width: 260px;
-  height: 260px;
+  height: 480px;
   margin: 0 auto;
 }
 .seat {
@@ -236,4 +231,42 @@ body {
   font-size: 0.8em;
   color: #ffb300;
   font-weight: bold;
+}
+#tables-plan table {
+  border-collapse: collapse;
+  margin-top: 0.5em;
+  min-width: 250px;
+}
+#tables-plan th, #tables-plan td {
+  border: 1px solid #555;
+  padding: 0.4em 1em;
+  text-align: center;
+}
+#tables-plan th {
+  background: #444;
+}
+#tables-plan {
+  display: block;
+  width: 100%;
+}
+.tables-flex {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2em;
+}
+.table-block {
+  background: #222;
+  border-radius: 1.5em;
+  box-shadow: 0 0 16px #000a;
+  padding: 2em 2em 2.5em 2em;
+  min-width: 220px;
+  max-width: 320px;
+  margin-bottom: 2em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.table-block table {
+  width: 100%;
 }

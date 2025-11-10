@@ -8,6 +8,7 @@ let timerInterval = null;
 let running = false;
 let structureTitle = "Poker Clock";
 let selectedPlayersIndexes = [];
+let playerAssignments = []; // [{index, table, seat}]
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -104,8 +105,8 @@ async function loadStructure() {
 
     if (levels.length === 0) throw new Error('Aucun niveau trouvé dans la structure.');
 
-    currentLevel = 0;
-    timeLeft = levels[0].duration;
+//    currentLevel = 0;
+//    timeLeft = levels[0].duration;
     document.getElementById('loading').style.display = 'none';
     updateDisplay();
     renderStructureTable();
@@ -121,27 +122,49 @@ async function loadPlayers() {
     const csvText = await response.text();
     const lines = csvText.trim().split('\n');
     // On ignore les 4 premières lignes
-    const data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
+    let data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
+
+    // Si assignation, trie les data selon table puis siège
+    if (playerAssignments.length > 0) {
+      data = data
+        .map((row, idx) => {
+          const assign = playerAssignments.find(a => a.index === idx);
+          return { row, idx, table: assign ? assign.table : 9999, seat: assign ? assign.seat : 9999 };
+        })
+        .sort((a, b) => a.table - b.table || a.seat - b.seat)
+        .map(obj => ({ row: obj.row, idx: obj.idx }));
+    } else {
+      data = data.map((row, idx) => ({ row, idx }));
+    }
 
     // Génère le tableau HTML
     let html = '<table id="players-table"><thead><tr>';
-    html += '<th></th><th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th>';
+    html += '<th></th><th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th><th>Table</th><th>Siège</th>';
     html += '</tr></thead><tbody>';
-    data.forEach((row, idx) => {
+    data.forEach(({row, idx}) => {
       if (row.length >= 7) {
         const checked = selectedPlayersIndexes.includes(idx) ? 'checked' : '';
+        // Cherche l'assignation pour ce joueur
+        let tableCell = '', seatCell = '';
+        const assign = playerAssignments.find(a => a.index === idx);
+        if (assign) {
+          tableCell = assign.table;
+          seatCell = assign.seat;
+        }
         html += `<tr>
           <td><input type="checkbox" class="player-checkbox" data-index="${idx}" ${checked}></td>
           <td>${row[0]}</td>
           <td>${row[1]}</td>
           <td>${row[5]}</td>
           <td>${row[6]}</td>
+          <td>${tableCell}</td>
+          <td>${seatCell}</td>
         </tr>`;
       }
     });
     html += '</tbody></table>';
 
-    document.getElementById('tab-joueurs').innerHTML = html;
+    document.getElementById('players-table-container').innerHTML = html;
 
     // Met à jour la sélection à chaque changement de case
     document.querySelectorAll('.player-checkbox').forEach(cb => {
@@ -169,6 +192,8 @@ async function loadPlayers() {
   } catch (e) {
     document.getElementById('tab-joueurs').innerHTML = '<p style="color:red;">Erreur de chargement des joueurs : ' + e.message + '</p>';
   }
+
+  exportAppToJSON();
 }
 
 function updateDisplay() {
@@ -225,6 +250,8 @@ function updateDisplay() {
   } else {
     nextBreakDiv.textContent = "";
   }
+
+  exportAppToJSON();
 }
 
 function formatTime(seconds) {
@@ -294,6 +321,9 @@ function showTab(tab) {
   if (tab === 'joueurs') {
     loadPlayers();
   }
+  if (tab === 'tables') {
+    renderTablesFromPlayers();
+  }
 }
 
 // Génère le tableau de structure complète
@@ -311,6 +341,8 @@ function renderStructureTable() {
   document.getElementById('structure-table-container').innerHTML = html;
 }
 
+restoreAppFromLocalStorage();
+loadPlayers();
 loadStructure();
 
 // Edition du titre
@@ -352,7 +384,7 @@ document.getElementById('edit-title-btn').addEventListener('click', function() {
   document.getElementById('edit-title-btn').disabled = true;
 });
 
-function generateTablePlan() {
+function assignSeats() {
   // Récupère les joueurs cochés selon selectedPlayersIndexes
   const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
   const checkedRows = rows.filter((tr, idx) => selectedPlayersIndexes.includes(idx));
@@ -383,36 +415,331 @@ function generateTablePlan() {
   const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
   const nbTables = Math.ceil(players.length / perTable);
 
-  // Répartition équilibrée
+  // Répartition équilibrée et assignation
+  playerAssignments = []; // reset
   let tables = Array.from({length: nbTables}, () => []);
   players.forEach((player, i) => {
-    tables[i % nbTables].push(player);
+    tables[i % nbTables].push({ ...player, originalIndex: selectedPlayersIndexes[i] });
   });
 
+  // Remplir playerAssignments
+  for (let t = 0; t < nbTables; t++) {
+    for (let s = 0; s < tables[t].length; s++) {
+      playerAssignments.push({
+        index: tables[t][s].originalIndex,
+        table: t + 1,
+        seat: s + 1
+      });
+    }
+  }
+
   // Génération du HTML graphique
-  let html = '<div class="table-graphic-container">';
+  let html = '<div class="tables-flex">';
   for (let t = 0; t < nbTables; t++) {
     const tablePlayers = tables[t];
-    const n = tablePlayers.length;
-    html += `<div class="table-graphic">
-      <div class="table-graphic-title">Table ${t + 1}</div>
-      <div class="seats-circle">`;
-
-    // Disposition circulaire des sièges
-    const radius = 110;
-    const centerX = 130, centerY = 130;
-    tablePlayers.forEach((p, s) => {
-      const angle = (2 * Math.PI * s) / n - Math.PI / 2;
-      const x = centerX + radius * Math.cos(angle) - 45; // 45 = seat width / 2
-      const y = centerY + radius * Math.sin(angle) - 25; // 25 = seat height / 2
-      html += `<div class="seat" style="left:${x}px;top:${y}px;">
-      <div class="seat-number">Siège ${s + 1}</div>
-      <div style="font-size:1.1em; font-weight:bold;">${p.winamax || '-'}</div>
-    </div>`;
-    });
-
-    html += `</div></div>`;
+    html += `<div class="table-block" style="margin:1em;display:inline-block;">
+      <strong style="color:#ffb300; font-size:1.3em;">Table ${t + 1}</strong>
+      <table style="margin:auto; background:#222; color:#fff; border-radius:8px; min-width:200px;">
+        <tbody>`;
+    for (let s = 0; s < perTable; s++) {
+      if (s < tablePlayers.length) {
+        const p = tablePlayers[s];
+        html += `<tr>
+          <td style="width:3em;">${s + 1}</td>
+          <td style="font-weight:bold; font-size:1.1em;">${p.winamax || '-'}</td>
+        </tr>`;
+      } else {
+        html += `<tr>
+          <td style="width:3em;">${s + 1}</td>
+          <td style="font-style:italic; color:#bbb;">(vide)</td>
+        </tr>`;
+      }
+    }
+    html += `</tbody></table></div>`;
   }
   html += '</div>';
   document.getElementById('tables-plan').innerHTML = html;
+
+  // Recharge le tableau des joueurs pour afficher les colonnes Table/Siège triées
+  loadPlayers();
+  renderTablesFromPlayers();
+  exportAppToJSON();
 }
+
+function renderTablesFromPlayers() {
+  // Récupère les infos du tableau des joueurs
+  const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
+  // On ne prend que les joueurs assignés à une table
+  let players = [];
+  rows.forEach(tr => {
+    const tds = tr.querySelectorAll('td');
+    const table = parseInt(tds[5]?.textContent);
+    const seat = parseInt(tds[6]?.textContent);
+    if (!isNaN(table) && !isNaN(seat)) {
+      players.push({
+        table,
+        seat,
+        winamax: tds[4].textContent
+      });
+    }
+  });
+
+  if (players.length === 0) {
+    document.getElementById('tables-plan').innerHTML = '<p style="color:red;">Aucune assignation de sièges.</p>';
+    return;
+  }
+
+  // Regroupe par table
+  const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+  const tables = {};
+  players.forEach(p => {
+    if (!tables[p.table]) tables[p.table] = [];
+    tables[p.table][p.seat - 1] = p.winamax;
+  });
+
+  // Génère le HTML
+  let html = '<div class="tables-flex">';
+  Object.keys(tables).sort((a, b) => a - b).forEach(tableNum => {
+    html += `<div class="table-block" style="margin:1em;display:inline-block;">
+      <strong style="color:#ffb300; font-size:1.3em;">Table ${tableNum}</strong>
+      <table style="margin:auto; background:#222; color:#fff; border-radius:8px; min-width:200px;">
+        <tbody>`;
+    for (let s = 0; s < perTable; s++) {
+      const winamax = tables[tableNum][s];
+      if (winamax) {
+        html += `<tr>
+          <td style="width:3em;">${s + 1}</td>
+          <td style="font-weight:bold; font-size:1.1em;">${winamax || '-'}</td>
+        </tr>`;
+      } else {
+        html += `<tr>
+          <td style="width:3em;">${s + 1}</td>
+          <td style="font-style:italic; color:#bbb;">(vide)</td>
+        </tr>`;
+      }
+    }
+    html += `</tbody></table></div>`;
+  });
+  html += '</div>';
+  document.getElementById('tables-plan').innerHTML = html;
+
+  exportAppToJSON();
+}
+
+function exportPlayersToJSON() {
+  const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
+  const players = rows.map(tr => {
+    const tds = tr.querySelectorAll('td');
+    return {
+      nom: tds[1]?.textContent.trim(),
+      prenom: tds[2]?.textContent.trim(),
+      mpla: tds[3]?.textContent.trim(),
+      winamax: tds[4]?.textContent.trim(),
+      table: tds[5]?.textContent.trim(),
+      siege: tds[6]?.textContent.trim(),
+      checked: tr.querySelector('input[type="checkbox"]')?.checked || false
+    };
+  });
+  // Stocke dans le localStorage (ou envoie à un serveur si besoin)
+  localStorage.setItem('joueurs_export', JSON.stringify(players));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Restauration automatique depuis localStorage
+  restoreAppFromLocalStorage();
+
+  // Bouton "Charger JSON" (restauration manuelle)
+  const loadBtn = document.getElementById('load-json-btn');
+  const fileInput = document.getElementById('load-json-file');
+  if (loadBtn && fileInput) {
+    loadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          importAppFromJSON(e.target.result); // Utilise la fonction d'import globale
+        } catch (err) {
+          alert("Erreur lors du chargement du fichier JSON.");
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+});
+
+// Fonction pour restaurer la sélection et l'assignation depuis le JSON
+function restorePlayersFromJSON(joueurs) {
+  // On reconstruit selectedPlayersIndexes et playerAssignments
+  selectedPlayersIndexes = [];
+  playerAssignments = [];
+  joueurs.forEach((p, idx) => {
+    if (p.checked) selectedPlayersIndexes.push(idx);
+    if (p.table && p.siege) {
+      playerAssignments.push({
+        index: idx,
+        table: parseInt(p.table),
+        seat: parseInt(p.siege)
+      });
+    }
+  });
+  // Recharge le tableau des joueurs et le plan des tables
+  loadPlayers();
+  if (typeof renderTablesFromPlayers === 'function') renderTablesFromPlayers();
+}
+
+function restoreAppFromLocalStorage() {
+  const appStateJSON = localStorage.getItem('poker_app_export');
+  if (!appStateJSON) return;
+  try {
+    const appState = JSON.parse(appStateJSON);
+
+    // Structure
+    if (appState.structure) levels = appState.structure;
+
+    // Horloge
+    if (appState.horloge) {
+      stopTimer();
+      currentLevel = appState.horloge.currentLevel ?? 0;
+      timeLeft = appState.horloge.timeLeft ?? 0;
+      baseFontSize = appState.horloge.baseFontSize ?? 2;
+      running = !!appState.horloge.running;
+      applyFontSizes();
+    }
+
+    // Joueurs
+    selectedPlayersIndexes = appState.selectedPlayersIndexes || [];
+    playerAssignments = appState.playerAssignments || [];
+
+    // Titre
+    if (appState.structureTitle) {
+      const titleElem = document.getElementById('structure-title');
+      if (titleElem) titleElem.textContent = appState.structureTitle;
+    }
+
+    // Recharge l’affichage
+    updateDisplay();
+    loadPlayers();
+    if (typeof renderTablesFromPlayers === 'function') renderTablesFromPlayers();
+
+    // Redémarre le timer si besoin
+    if (running) startTimer();
+
+  } catch (e) {
+    alert("Erreur lors de la restauration depuis le localStorage.");
+  }
+}
+
+function exportAppToJSON() {
+  // Sauvegarde la structure du tournoi
+  const structure = levels;
+  // Sauvegarde l’état de l’horloge
+  const horloge = {
+    currentLevel,
+    timeLeft,
+    running,
+    baseFontSize
+  };
+  // Sauvegarde la sélection et l’assignation des joueurs
+  const joueurs = Array.from(document.querySelectorAll('#players-table tbody tr')).map(tr => {
+    const tds = tr.querySelectorAll('td');
+    return {
+      nom: tds[1]?.textContent.trim(),
+      prenom: tds[2]?.textContent.trim(),
+      mpla: tds[3]?.textContent.trim(),
+      winamax: tds[4]?.textContent.trim(),
+      table: tds[5]?.textContent.trim(),
+      siege: tds[6]?.textContent.trim(),
+      checked: tr.querySelector('input[type="checkbox"]')?.checked || false
+    };
+  });
+
+  const appState = {
+    structure,
+    horloge,
+    selectedPlayersIndexes,
+    playerAssignments,
+    joueurs,
+    structureTitle: document.getElementById('structure-title')?.textContent || ''
+  };
+
+  // Sauvegarde dans localStorage
+  localStorage.setItem('poker_app_export', JSON.stringify(appState));
+}
+
+function importAppFromJSON(json) {
+  try {
+    const appState = typeof json === 'string' ? JSON.parse(json) : json;
+
+    // Structure
+    if (appState.structure) levels = appState.structure;
+
+    // Horloge
+    if (appState.horloge) {
+      stopTimer();
+      currentLevel = appState.horloge.currentLevel ?? 0;
+      timeLeft = appState.horloge.timeLeft ?? 0;
+      baseFontSize = appState.horloge.baseFontSize ?? 2;
+      running = !!appState.horloge.running;
+      applyFontSizes();
+    }
+
+    // Joueurs
+    selectedPlayersIndexes = appState.selectedPlayersIndexes || [];
+    playerAssignments = appState.playerAssignments || [];
+
+    // Titre
+    if (appState.structureTitle) {
+      const titleElem = document.getElementById('structure-title');
+      if (titleElem) titleElem.textContent = appState.structureTitle;
+    }
+
+    // Recharge l’affichage
+    updateDisplay();
+    loadPlayers();
+    if (typeof renderTablesFromPlayers === 'function') renderTablesFromPlayers();
+
+    // Redémarre le timer si besoin
+    if (running) startTimer();
+
+  } catch (e) {
+    alert("Erreur lors de l'import du fichier JSON.");
+  }
+}
+
+// Export
+document.addEventListener('DOMContentLoaded', function() {
+  const exportBtn = document.getElementById('export-app-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', function() {
+      exportAppToJSON();
+      const json = localStorage.getItem('poker_app_export');
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'poker_app.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+  // Import
+  const importBtn = document.getElementById('import-app-btn');
+  const fileInput = document.getElementById('import-app-file');
+  if (importBtn && fileInput) {
+    importBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        importAppFromJSON(e.target.result);
+      };
+      reader.readAsText(file);
+    });
+  }
+});
+

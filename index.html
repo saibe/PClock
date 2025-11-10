@@ -34,21 +34,26 @@
       <div id="loading" style="margin-top: 1em; color: #aaa; display: none;">Chargement de la structure...</div>
     </div>
 
+    <div id="tab-tables" class="tab-content">
+      <div id="tables-plan"></div>
+    </div>
+
     <div id="tab-structure" class="tab-content">
       <div id="structure-table-container"></div>
     </div>
 
     <div id="tab-joueurs" class="tab-content">
-      <p>Gestion des joueurs à venir…</p>
+      <button id="export-app-btn" style="margin-bottom:1em; font-size:1.1em;">Exporter appli JSON</button>
+      <button id="import-app-btn" style="margin-bottom:1em; font-size:1.1em;">Charger appli JSON</button>
+      <input type="file" id="import-app-file" accept=".json" style="display:none;">
+      <div style="margin-bottom:1em;">
+        <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
+        <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
+        <button onclick="assignSeats()" style="font-size:1.1em; margin-left:1em;">Assignation sièges</button>
+      </div>
+      <div id="players-table-container"></div>
     </div>
     
-    <div style="margin-bottom:1em;">
-      <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
-      <input type="number" id="players-per-table" min="2" max="20" value="8" style="width:3em; font-size:1.1em;">
-      <button onclick="generateTablePlan()" style="font-size:1.1em; margin-left:1em;">Générer le plan</button>
-    </div>
-    <div id="tables-plan"></div>
-
   </div>
   <script src="script.js"></script>
 </body>
