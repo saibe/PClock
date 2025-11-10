@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Poker Clock</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="title">
+      <h1 id="structure-title">En gras les valeurs modifiables  Structure Tournoi</h1>
+    </div>
+    <div id="level" style="margin-bottom:0.5em;">Niveau 4</div>
+    <div id="timer">18:00</div>
+    <div id="blinds-info">200 / 400</div>
+    <div id="next-level-info"></div>
+    <div id="next-break-info"></div>
+    <div class="controls">
+      <button onclick="prevLevel()">⏮️ Précédent</button>
+      <button onclick="toggleTimer()" id="startStopBtn">▶️ Démarrer</button>
+      <button onclick="nextLevel()">⏭️ Suivant</button>
+      <button onclick="resetTimer()">🔄 Réinitialiser</button>
+    </div>
+    <div id="loading" style="margin-top: 1em; color: #aaa; display: none;">Chargement de la structure...</div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

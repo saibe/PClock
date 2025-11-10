@@ -1,0 +1,76 @@
+body {
+  background: #222;
+  color: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+.container {
+  background: #333;
+  padding: 2em 3em;
+  border-radius: 16px;
+  box-shadow: 0 0 24px #000a;
+  text-align: center;
+}
+.title {
+  background-color: chocolate;
+  text-align: center;
+  padding: 0.5em 0;
+  font-size: xx-large;
+  border-radius: 12px 12px 0 0;
+  margin-bottom: 1em;
+}
+#structure-title {
+  margin: 0;
+  font-weight: bold;
+}
+#timer {
+  font-size: 5em;
+  margin: 0.5em 0;
+  letter-spacing: 0.1em;
+}
+#level {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+}
+#next-level-info {
+  margin: 0.5em 0 0.2em 0;
+  font-size: 1.2em;
+  color: #bbb;
+}
+#next-break-info {
+  margin: 0.2em 0 1em 0;
+  font-size: 1.1em;
+  color: #bbb;
+}
+#blinds-info {
+  font-size: 8em ! important;
+  margin: 0.5em 0 0.5em 0;
+}
+#blinds-info.pause {
+  background: darkred;
+  color: #fff;
+  border-radius: 0.2em;
+  padding: 0.2em 0.5em;
+  font-weight: bold;
+  font-size: 2em;
+  letter-spacing: 0.1em;
+  margin: 0.5em 0 1em 0;
+}
+.controls button {
+  font-size: 1.2em;
+  margin: 0.3em;
+  padding: 0.5em 1.2em;
+  border: none;
+  border-radius: 8px;
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.controls button:hover {
+  background: #666;
+}
