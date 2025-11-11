@@ -270,3 +270,24 @@ body {
 .table-block table {
   width: 100%;
 }
+#classement-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #222;
+  color: #fff;
+  margin-top: 1em;
+}
+#classement-table th, #classement-table td {
+  border: 1px solid #555;
+  padding: 0.5em 1em;
+  text-align: center;
+}
+#classement-table th {
+  background: #444;
+}
+#classement-table select:disabled {
+  background: #333;
+  color: #888;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
