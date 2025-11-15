@@ -10,6 +10,7 @@ let structureTitle = "Poker Clock";
 let selectedPlayersIndexes = [];
 let playerAssignments = []; // [{index, table, seat}]
 let classementData = [];
+let classementSort = { column: 'rank', asc: true };
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -42,6 +43,50 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
   }
 });
+
+function syncJoueursToClassement() {
+  if (!window.joueursImportes || window.joueursImportes.length === 0) {
+    alert("Aucun joueur importé !");
+    return;
+  }
+  classementData = window.joueursImportes.map(j => ({
+    winamax: j.winamax,
+    nom: j.nom,
+    prenom: j.prenom,
+    mpla: j.mpla,
+    round: '', heure: '', killer: '', out: false, rank: '', table: '', siege: '', paye: false
+  }));
+  renderClassement();
+  renderTablesFromPlayers();
+  exportAppToJSON();
+}
+
+function importJoueursCSV() {
+  fetch(PLAYERS_CSV_URL)
+    .then(response => response.text())
+    .then(csvText => {
+      const lines = csvText.trim().split('\n');
+      let data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
+      let html = '<table id="players-table"><thead><tr>';
+      html += '<th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th></tr></thead><tbody>';
+      data.forEach(row => {
+        if (row.length >= 7) {
+          html += `<tr>
+            <td>${row[0]}</td>
+            <td>${row[1]}</td>
+            <td>${row[5]}</td>
+            <td>${row[6]}</td>
+          </tr>`;
+        }
+      });
+      html += '</tbody></table>';
+      document.getElementById('players-table-container').innerHTML = html;
+      // Stocke la liste brute pour la synchronisation
+      window.joueursImportes = data.map(row => ({
+        nom: row[0], prenom: row[1], mpla: row[5], winamax: row[6]
+      }));
+    });
+}
 
 // Date et heure en haut
 function updateDateTime() {
@@ -123,32 +168,21 @@ async function loadPlayers() {
     // On ignore les 4 premières lignes
     let data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
 
-    // Si assignation, trie les data selon table puis siège
-    if (playerAssignments.length > 0) {
-      data = data
-        .map((row, idx) => {
-          const assign = playerAssignments.find(a => a.index === idx);
-          return { row, idx, table: assign ? assign.table : 9999, seat: assign ? assign.seat : 9999 };
-        })
-        .sort((a, b) => a.table - b.table || a.seat - b.seat)
-        .map(obj => ({ row: obj.row, idx: obj.idx }));
-    } else {
-      data = data.map((row, idx) => ({ row, idx }));
-    }
-
     // Génère le tableau HTML
     let html = '<table id="players-table"><thead><tr>';
-    html += '<th></th><th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th>';
+    html += '<th></th><th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th><th>Table</th><th>Siège</th>';
     html += '</tr></thead><tbody>';
-    data.forEach(({row, idx}) => {
+    data.forEach((row, idx) => {
       if (row.length >= 7) {
-        const checked = selectedPlayersIndexes.includes(idx) ? 'checked' : '';
-        // Cherche l'assignation pour ce joueur
+        // Case cochée si le joueur est dans classementData
+        const winamax = row[6];
+        const checked = classementData.some(p => p.winamax === winamax) ? 'checked' : '';
+        // Affiche l'assignation restaurée
         let tableCell = '', seatCell = '';
-        const assign = playerAssignments.find(a => a.index === idx);
-        if (assign) {
-          tableCell = assign.table;
-          seatCell = assign.seat;
+        const p = classementData.find(p => p.winamax === winamax);
+        if (p) {
+          tableCell = p.table || '';
+          seatCell = p.siege || '';
         }
         html += `<tr>
           <td><input type="checkbox" class="player-checkbox" data-index="${idx}" ${checked}></td>
@@ -156,6 +190,8 @@ async function loadPlayers() {
           <td>${row[1]}</td>
           <td>${row[5]}</td>
           <td>${row[6]}</td>
+          <td>${tableCell}</td>
+          <td>${seatCell}</td>
         </tr>`;
       }
     });
@@ -172,7 +208,6 @@ async function loadPlayers() {
         } else {
           selectedPlayersIndexes = selectedPlayersIndexes.filter(i => i !== idx);
         }
-        // Ajoute cette ligne :
         if (typeof renderClassement === 'function') renderClassement();
       });
     });
@@ -264,6 +299,7 @@ function nextLevel() {
     currentLevel++;
     timeLeft = levels[currentLevel].duration;
     stopTimer();
+    playMultiToneAlert();
     updateDisplay();
   }
 }
@@ -273,6 +309,7 @@ function prevLevel() {
     currentLevel--;
     timeLeft = levels[currentLevel].duration;
     stopTimer();
+    playMultiToneAlert();
     updateDisplay();
   }
 }
@@ -306,10 +343,88 @@ function stopTimer() {
   updateDisplay();
 }
 
-function resetTimer() {
-  timeLeft = levels[currentLevel].duration;
-  stopTimer();
+function playLongBeep(duration = 2) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = 'sine'; // Tu peux essayer 'triangle' ou 'square' ou 'sine' pour un son différent
+  o.frequency.value = 660; // Fréquence du son (Hz), modifie pour un son plus grave/aigu
+  o.connect(g);
+  g.connect(ctx.destination);
+  g.gain.value = 0.2;
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+  o.stop(ctx.currentTime + duration);
+}
+
+function playMultiToneAlert() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Tableau des [fréquence en Hz, durée en secondes]
+
+  const tones = [
+    [ 800, 0.9],
+    [   0, 0.1],
+    [ 800, 0.9],
+    [   0, 0.1],
+    [ 800, 0.9],
+    [   0, 0.1],
+    [ 800, 0.5], 
+    [2500, 0.2], 
+    [1000, 0.1], 
+    [2500, 0.1], 
+    [1000, 0.1], 
+    [2500, 0.1], 
+    [1000, 0.1], 
+    [2500, 0.1], 
+    [1000, 0.1], 
+    [2500, 0.1], 
+    [1000, 0.5], 
+  ];
+
+  let currentTime = ctx.currentTime;
+
+  tones.forEach(([freq, duration], i) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.value = freq;
+    o.connect(g);
+    g.connect(ctx.destination);
+    g.gain.value = 0.2;
+
+    o.start(currentTime);
+    g.gain.setValueAtTime(0.2, currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, currentTime + duration);
+
+    o.stop(currentTime + duration);
+
+    currentTime += duration;
+  });
+}
+
+function resetAll() {
+  // 1. Remet le chrono au round 1
+  currentLevel = 0;
+  timeLeft = levels[0]?.duration || 0;
+  running = false;
+  clearInterval(timerInterval);
+
+  // 2. Réinitialise la sélection des joueurs
+  selectedPlayersIndexes = [];
+
+  // 3. Réinitialise le classement
+  classementData = [];
+
+  // 4. Réinitialise l’assignation des sièges
+  playerAssignments = [];
+
+  // 5. Rafraîchit l’affichage
   updateDisplay();
+  loadPlayers();
+  renderClassement();
+  renderTablesFromPlayers();
+  exportAppToJSON();
 }
 
 function showTab(tab) {
@@ -386,65 +501,82 @@ document.getElementById('edit-title-btn').addEventListener('click', function() {
   document.getElementById('edit-title-btn').disabled = true;
 });
 
+function sortClassement(column) {
+  if (classementSort.column === column) {
+    classementSort.asc = !classementSort.asc;
+  } else {
+    classementSort.column = column;
+    classementSort.asc = true;
+  }
+  renderClassement();
+}
+
 function renderClassement() {
-  // Récupère les joueurs cochés
-  const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
-  const checkedRows = rows.filter((tr, idx) => selectedPlayersIndexes.includes(idx));
-  const winamaxList = checkedRows.map(tr => tr.querySelectorAll('td')[4]?.textContent.trim());
-
-  // Mets à jour classementData pour ne garder que les joueurs cochés
-  classementData = winamaxList.map(winamax => {
-    let existing = classementData.find(p => p.winamax === winamax);
-    return existing ? { ...existing } : { winamax, round: '', heure: '', killer: '', out: false, rank: '' };
-  });
-
-  // Trie par rank croissant (rank vide < 1)
-  classementData.sort((a, b) => {
-    if (!a.rank && !b.rank) return 0;
-    if (!a.rank) return -1;
-    if (!b.rank) return 1;
-    return a.rank - b.rank;
+  const classementAffiche = [...classementData].sort((a, b) => {
+    const col = classementSort.column;
+    let av = a[col], bv = b[col];
+    if (col === 'rank' || col === 'table' || col === 'siege') {
+      av = av ? parseInt(av) : 0;
+      bv = bv ? parseInt(bv) : 0;
+    }
+    if (col === 'out') {
+      av = !!av;
+      bv = !!bv;
+    }
+    if (av === bv) return 0;
+    if (classementSort.asc) {
+      return av > bv ? 1 : -1;
+    } else {
+      return av < bv ? 1 : -1;
+    }
   });
 
   // Liste des joueurs encore en jeu (non éliminés)
-  const stillIn = classementData.filter(p => !p.out).map(p => p.winamax);
+  const stillIn = classementAffiche.filter(p => !p.out).map(p => p.winamax);
 
   // Génère le tableau HTML
-  let html = '<table id="classement-table"><thead><tr><th>Rank</th><th>Winamax</th><th>Table</th><th>Siège</th><th>Out</th><th>Round</th><th>Heure</th><th>Killer</th></tr></thead><tbody>';
-  classementData.forEach((p, i) => {
-    // Trouver l'index du joueur dans selectedPlayersIndexes
-    const playerIdx = selectedPlayersIndexes.find(idx => {
-      // On récupère le winamax du joueur à cet index dans le tableau des joueurs
-      const tr = rows[idx];
-      if (!tr) return false;
-      const winamax = tr.querySelectorAll('td')[4]?.textContent.trim();
-      return winamax === p.winamax;
-    });
-
+  let html = `<table id="classement-table">
+    <thead>
+      <tr>
+        <th onclick="sortClassement('paye')">paye</th>
+        <th onclick="sortClassement('rank')">Rank</th>
+        <th onclick="sortClassement('winamax')">Winamax</th>
+        <th onclick="sortClassement('table')">Table</th>
+        <th onclick="sortClassement('siege')">Siège</th>
+        <th onclick="sortClassement('out')">Out</th>
+        <th onclick="sortClassement('round')">Round</th>
+        <th onclick="sortClassement('heure')">Heure</th>
+        <th onclick="sortClassement('killer')">Killer</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+  classementAffiche.forEach((p, i) => {
     // Trouver l'assignation table/siège par winamax
     let tableCell = '', seatCell = '';
     const assign = playerAssignments.find(a => a.winamax === p.winamax);
     if (assign) {
-      tableCell = assign.table;
-      seatCell = assign.seat;
+      tableCell = (assign.table !== undefined && !isNaN(assign.table)) ? assign.table : '';
+      seatCell = (assign.seat !== undefined && !isNaN(assign.seat)) ? assign.seat : '';
     }
-  
+
     // Pour la colonne killer, on crée une liste déroulante
-    let killerSelect = `<select onchange="updateClassementCell(${i},'killer',this.value)" ${p.out ? '' : 'disabled'}>`;
+    let killerSelect = `<select onchange="updateClassementCell('${p.winamax}','killer',this.value)" ${p.out ? '' : 'disabled'}>`;
     killerSelect += `<option value="">--</option>`;
     stillIn
-      .filter(w => w !== p.winamax) // On ne propose pas soi-même
+      .filter(w => w !== p.winamax)
       .forEach(w => {
         killerSelect += `<option value="${w}"${p.killer === w ? ' selected' : ''}>${w}</option>`;
       });
     killerSelect += '</select>';
 
     html += `<tr>
+      <td><input type="checkbox" ${p.paye ? 'checked' : ''} onchange="togglePaye('${p.winamax}')"></td>
       <td>${p.rank || ''}</td>
       <td>${p.winamax}</td>
       <td>${tableCell}</td>
       <td>${seatCell}</td>
-      <td><input type="checkbox" ${p.out ? 'checked' : ''} onchange="toggleOutClassement(${i})"></td>
+      <td><input type="checkbox" ${p.out ? 'checked' : ''} onchange="toggleOutClassement('${p.winamax}')"></td>
       <td>${p.round}</td>
       <td>${p.heure}</td>
       <td>${killerSelect}</td>
@@ -454,9 +586,19 @@ function renderClassement() {
   document.getElementById('classement-container').innerHTML = html;
 }
 
-function toggleOutClassement(index) {
-  if (!classementData[index]) return;
+function togglePaye(winamax) {
+  const p = classementData.find(p => p.winamax === winamax);
+  if (p) {
+    p.paye = !p.paye;
+    exportAppToJSON();
+    renderClassement();
+  }
+}
 
+function toggleOutClassement(winamax) {
+  const index = classementData.findIndex(p => p.winamax === winamax);
+  if (index === -1) return;
+  
   // 1. Met à jour l'état "out" et les infos d'élimination
   const wasOut = classementData[index].out;
   classementData[index].out = !wasOut;
@@ -483,7 +625,6 @@ function toggleOutClassement(index) {
   }
 
   // 2. Met à jour playerAssignments (supprime l'assignation du joueur out)
-  const winamax = classementData[index].winamax;
   playerAssignments = playerAssignments.filter(a => a.winamax !== winamax);
 
   // 3. Rééquilibrage des tables avec la fonction fusionnée
@@ -517,14 +658,30 @@ function toggleOutClassement(index) {
 
   // 5. Affiche la popup si besoin
   if (tablesCassees.length > 0 || changes.length > 0) {
-    let html = '<h2>Changements d\'assignation</h2><ul>';
-    tablesCassees.forEach(tc => {
-      html += `<li style="color:#ffb300;"><b>La table ${tc} casse</b></li>`;
-    });
-    changes.forEach(c => {
-      html += `<li><b>${c.winamax}</b> : Table ${c.from.table} Siège ${c.from.siege} → Table ${c.to.table} Siège ${c.to.siege}</li>`;
-    });
-    html += '</ul>';
+    let html = '<h2>Changements d\'assignation</h2>';
+    if (tablesCassees.length > 0) {
+      html += '<div style="margin-bottom:1em;">';
+      tablesCassees.forEach(tc => {
+        html += `<div style="color:#ffb300; font-weight:bold;font-size:2em;">La table ${tc} casse</div>`;
+      });
+      html += '</div>';
+    }
+    if (changes.length > 0) {
+      html += `
+        <table style="margin:auto; background:#222; color:#fff; border-radius:8px; min-width:50%;">
+          <tbody>
+      `;
+      changes.forEach(c => {
+        html += `
+          <tr>
+            <td style="font-weight:bold; padding:0.3em 1em;">${c.winamax}</td>
+            <td style="padding:0.3em 1em;">Table ${c.from.table} Siège ${c.from.siege}</td>
+            <td style="padding:0.3em 1em;">Table ${c.to.table} Siège ${c.to.siege}</td>
+          </tr>
+        `;
+      });
+      html += '</tbody></table>';
+    }
     showPopup(html);
   }
 
@@ -557,75 +714,133 @@ function getClassementData() {
  * @returns {Object} { assignments: [...], changes: [...], tablesCassees: [...] }
  */
 function equilibrerTables(joueurs, perTable, oldAssignments = []) {
-  // 1. Calcul du nombre de tables nécessaires
   const totalPlayers = joueurs.length;
   const nbTables = Math.ceil(totalPlayers / perTable);
 
-  // 2. Calcul du nombre de joueurs par table pour équilibrer
-  const minPerTable = Math.floor(totalPlayers / nbTables);
-  const maxPerTable = Math.ceil(totalPlayers / nbTables);
-  const tablesWithMax = totalPlayers % nbTables; // nombre de tables à max joueurs
-
-  // 3. Regrouper les anciens assignments par table
+  // Regrouper les anciens assignments par table
   let oldByTable = {};
   oldAssignments.forEach(a => {
     if (!oldByTable[a.table]) oldByTable[a.table] = [];
     oldByTable[a.table].push(a);
   });
 
-  // 4. Préparer la nouvelle répartition
-  let assignments = [];
-  let changes = [];
+  // 1. Si le nombre de tables diminue, on ferme la table la moins remplie
+  let oldTables = Array.from(new Set(oldAssignments.map(a => a.table)));
   let tablesCassees = [];
+  let joueursToReassign = [];
+  if (oldTables.length > nbTables) {
+    let tablesToClose = [...oldTables]
+      .sort((a, b) => (oldByTable[a]?.length || 0) - (oldByTable[b]?.length || 0))
+      .slice(0, oldTables.length - nbTables);
+    tablesCassees = tablesToClose.map(Number);
+    tablesToClose.forEach(tc => {
+      if (oldByTable[tc]) joueursToReassign.push(...oldByTable[tc]);
+      delete oldByTable[tc];
+    });
+  }
 
-  // 5. Générer la liste des tables à utiliser
-  let tableNumbers = [];
-  for (let t = 1; t <= nbTables; t++) tableNumbers.push(t);
+  // 2. Génère la liste des tables restantes
+  let tableNumbers;
+  if (tablesCassees.length > 0) {
+    tableNumbers = oldTables.filter(t => !tablesCassees.includes(Number(t))).map(Number).sort((a, b) => a - b);
+  } else {
+    tableNumbers = oldTables.map(Number).sort((a, b) => a - b);
+    while (tableNumbers.length < nbTables) {
+      let next = (tableNumbers.length ? Math.max(...tableNumbers) : 0) + 1;
+      tableNumbers.push(next);
+    }
+  }
 
-  // 6. Répartir les joueurs en essayant de garder leur place si possible
-  // a) On commence par remplir les tables avec les anciens joueurs qui peuvent rester
-  let joueursRestants = [...joueurs];
+  // 3. Place les joueurs à leur table/siège d'origine si possible (hors tables cassées)
+  let assignments = [];
   let usedWinamax = new Set();
+  let usedSeatsByTable = {};
+  tableNumbers.forEach(tableNum => usedSeatsByTable[tableNum] = new Set());
 
-  tableNumbers.forEach((tableNum, idx) => {
-    const playersThisTable = idx < tablesWithMax ? maxPerTable : minPerTable;
+  tableNumbers.forEach(tableNum => {
     let oldTable = oldByTable[tableNum] || [];
-    let usedSeats = new Set();
-
-    // On place d'abord les anciens joueurs de cette table qui sont encore là et qui n'ont pas déjà été placés
     oldTable.forEach(a => {
-      if (joueursRestants.find(j => j.winamax === a.winamax) && assignments.length < totalPlayers && usedSeats.size < playersThisTable) {
+      if (joueurs.find(j => j.winamax === a.winamax) && !usedSeatsByTable[tableNum].has(a.siege || a.seat)) {
         assignments.push({
           winamax: a.winamax,
           table: tableNum,
           seat: a.siege || a.seat || 1
         });
         usedWinamax.add(a.winamax);
-        usedSeats.add(a.siege || a.seat || 1);
+        usedSeatsByTable[tableNum].add(a.siege || a.seat || 1);
       }
     });
+  });
 
-    // Compléter avec les nouveaux joueurs ou ceux qui n'ont pas pu garder leur place
-    for (let s = 1; assignments.filter(a => a.table === tableNum).length < playersThisTable; s++) {
+  // 4. Pour les joueurs à réassigner (tables cassées), on les place sur les tables restantes, sur le premier siège libre
+  joueursToReassign.forEach(j => {
+    let destTable = tableNumbers
+      .sort((a, b) => assignments.filter(x => x.table === a).length - assignments.filter(x => x.table === b).length)[0];
+    let usedSeats = usedSeatsByTable[destTable];
+    let s = 1;
+    while (usedSeats.has(s)) s++;
+    assignments.push({
+      winamax: j.winamax,
+      table: destTable,
+      seat: s
+    });
+    usedWinamax.add(j.winamax);
+    usedSeats.add(s);
+  });
+
+  // 5. Équilibrage strict : on déplace le minimum de joueurs pour que l’écart max soit 1
+  let changed = true;
+  while (changed) {
+    // Calcule la taille de chaque table
+    let sizes = tableNumbers.map(t => assignments.filter(a => a.table === t).length);
+    let max = Math.max(...sizes);
+    let min = Math.min(...sizes);
+    if (max - min <= 1) break; // équilibre atteint
+
+    // Trouve la table la plus remplie et la moins remplie
+    let tMax = tableNumbers.find(t => assignments.filter(a => a.table === t).length === max);
+    let tMin = tableNumbers.find(t => assignments.filter(a => a.table === t).length === min);
+
+    // Prend le joueur avec le plus grand siège de la table la plus remplie
+    let toMove = assignments
+      .filter(a => a.table === tMax)
+      .sort((a, b) => (b.seat || 0) - (a.seat || 0))[0];
+
+    // Cherche le premier siège libre sur la table la moins remplie
+    let usedSeats = usedSeatsByTable[tMin];
+    let newSeat = 1;
+    while (usedSeats.has(newSeat)) newSeat++;
+
+    // Déplace le joueur
+    assignments = assignments.filter(a => a.winamax !== toMove.winamax);
+    assignments.push({
+      winamax: toMove.winamax,
+      table: tableNum,
+      seat: newSeat
+    });
+    usedSeatsByTable[tMin].add(newSeat);
+    usedSeatsByTable[tMax].delete(toMove.seat);
+    // On boucle jusqu'à équilibre
+  }
+
+  // 6. Pour les nouveaux joueurs (jamais assignés), on leur attribue le premier siège libre sur une table ouverte
+  tableNumbers.forEach(tableNum => {
+    let usedSeats = usedSeatsByTable[tableNum];
+    for (let s = 1; assignments.filter(a => a.table === tableNum).length < perTable; s++) {
       if (usedSeats.has(s)) continue;
-      let nextJoueur = joueursRestants.find(j => !usedWinamax.has(j.winamax));
+      let nextJoueur = joueurs.find(j => !assignments.find(a => a.winamax === j.winamax));
       if (!nextJoueur) break;
       assignments.push({
         winamax: nextJoueur.winamax,
         table: tableNum,
         seat: s
       });
-      usedWinamax.add(nextJoueur.winamax);
       usedSeats.add(s);
     }
   });
 
-  // 7. Détecter les changements et les tables cassées
-  // a) Tables cassées = tables de oldAssignments qui ne sont plus dans la nouvelle répartition
-  let oldTables = Array.from(new Set(oldAssignments.map(a => a.table)));
-  tablesCassees = oldTables.filter(t => !tableNumbers.includes(t));
-
-  // b) Changements d'assignation
+  // 7. Changements d'assignation (pour la popup)
+  let changes = [];
   assignments.forEach(a => {
     let old = oldAssignments.find(o => o.winamax === a.winamax);
     if (!old || old.table !== a.table || (old.siege || old.seat) !== a.seat) {
@@ -640,33 +855,63 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   return { assignments, changes, tablesCassees };
 }
 
-function assignSeats() {
-  // 1. Liste des joueurs sélectionnés (non éliminés)
-  const joueurs = classementData
-    .filter(p => !p.out)
-    .map(p => ({ winamax: p.winamax }));
+function syncSelectedPlayersIndexes() {
+  selectedPlayersIndexes = [];
+  const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
+  rows.forEach((tr, idx) => {
+    const winamax = tr.querySelectorAll('td')[4]?.textContent.trim();
+    if (classementData.some(p => p.winamax === winamax)) {
+      selectedPlayersIndexes.push(idx);
+      // Coche la case dans le DOM pour l'affichage immédiat
+      const cb = tr.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = true;
+    }
+  });
+}
 
-  // 2. Nombre de joueurs max par table
+function assignSeats() {
+  // Prend uniquement les joueurs payés
+  const joueurs = classementData.filter(p => p.paye).map(p => ({ winamax: p.winamax }));
+  if (joueurs.length === 0) {
+    alert("Aucun joueur payé !");
+    return;
+  }
+
+  // Nombre de joueurs max par table
   const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
 
-  // 3. Appel à la fonction fusionnée (assignation initiale, donc oldAssignments = [])
-  const { assignments, changes, tablesCassees } = equilibrerTables(joueurs, perTable, []);
+  // Construit oldAssignments à partir de classementData pour les joueurs payés
+  const oldAssignments = joueurs.map(j => {
+    const p = classementData.find(p => p.winamax === j.winamax);
+    return (p && p.table && p.siege && !isNaN(parseInt(p.table)) && !isNaN(parseInt(p.siege)))
+      ? { winamax: p.winamax, table: parseInt(p.table), seat: parseInt(p.siege) }
+      : { winamax: j.winamax };
+  });
 
-  // 4. Appliquer les résultats
+  // Appel à la fonction d'équilibrage stricte
+  const { assignments, changes, tablesCassees } = equilibrerTables(joueurs, perTable, oldAssignments);
+
+  // Mets à jour classementData pour TOUS les joueurs payés
   assignments.forEach(a => {
     let p = classementData.find(p => p.winamax === a.winamax);
     if (p) {
       p.table = a.table;
       p.siege = a.seat;
+    } else {
+      classementData.push({
+        winamax: a.winamax,
+        round: '', heure: '', killer: '', out: false, rank: '', table: a.table, siege: a.seat, paye: true
+      });
     }
   });
+
+  // Mets à jour playerAssignments
   playerAssignments = assignments.map(a => ({
     winamax: a.winamax,
     table: a.table,
     seat: a.seat
   }));
 
-  // 5. Rafraîchir l'affichage
   renderClassement();
   renderTablesFromPlayers();
   exportAppToJSON();
@@ -823,17 +1068,14 @@ function restoreAppFromLocalStorage() {
 }
 
 function exportAppToJSON() {
-  // Sauvegarde la structure du tournoi
   const structure = levels;
-  // Sauvegarde l’état de l’horloge
   const horloge = {
     currentLevel,
     timeLeft,
     running,
     baseFontSize
   };
-  const classement = getClassementData();
-  // Sauvegarde la sélection et l’assignation des joueurs
+  const classement = classementData.map(p => ({ ...p }));
   const joueurs = Array.from(document.querySelectorAll('#players-table tbody tr')).map(tr => {
     const tds = tr.querySelectorAll('td');
     return {
@@ -851,25 +1093,19 @@ function exportAppToJSON() {
     structure,
     horloge,
     selectedPlayersIndexes,
-    playerAssignments,
+    playerAssignments: playerAssignments.map(a => ({ ...a })),
     joueurs,
     classement,
-    classementData,
     structureTitle: document.getElementById('structure-title')?.textContent || ''
   };
 
-  // Sauvegarde dans localStorage
   localStorage.setItem('poker_app_export', JSON.stringify(appState));
 }
 
 function importAppFromJSON(json) {
   try {
     const appState = typeof json === 'string' ? JSON.parse(json) : json;
-
-    // Structure
     if (appState.structure) levels = appState.structure;
-
-    // Horloge
     if (appState.horloge) {
       stopTimer();
       currentLevel = appState.horloge.currentLevel ?? 0;
@@ -878,34 +1114,23 @@ function importAppFromJSON(json) {
       running = !!appState.horloge.running;
       applyFontSizes();
     }
-
-    // Joueurs
-    selectedPlayersIndexes = appState.selectedPlayersIndexes || [];
-    playerAssignments = appState.playerAssignments || [];
-
-    // Titre
+    playerAssignments = (appState.playerAssignments || []).map(a => ({ ...a }));
     if (appState.structureTitle) {
       const titleElem = document.getElementById('structure-title');
       if (titleElem) titleElem.textContent = appState.structureTitle;
     }
-
-    // classement
     if (appState.classement) {
-      // Stocke dans une variable globale si besoin
-      window.classementData = appState.classement;
-      // Ou bien, régénère le tableau classement à partir de ces données
-      renderClassementFromData(appState.classement);
-      renderClassement();
+      classementData = appState.classement.map(p => ({ ...p }));
     }
 
-    // Recharge l’affichage
-    updateDisplay();
     loadPlayers();
-    if (typeof renderTablesFromPlayers === 'function') renderTablesFromPlayers();
-
-    // Redémarre le timer si besoin
-    if (running) startTimer();
-
+    setTimeout(() => {
+      syncSelectedPlayersIndexes();
+      renderClassement();
+      renderTablesFromPlayers();
+      updateDisplay();
+      if (running) startTimer();
+    }, 0);
   } catch (e) {
     alert("Erreur lors de l'import du fichier JSON.");
   }
@@ -928,8 +1153,9 @@ function renderClassementFromData(classement) {
   document.getElementById('classement-container').innerHTML = html;
 }
 
-function updateClassementCell(index, field, value) {
-  if (classementData[index]) {
+function updateClassementCell(winamax, field, value) {
+  const index = classementData.findIndex(p => p.winamax === winamax);
+  if (index !== -1) {
     classementData[index][field] = value;
     exportAppToJSON();
   }

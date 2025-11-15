@@ -30,7 +30,7 @@
         <button onclick="prevLevel()">⏮️ Précédent</button>
         <button onclick="toggleTimer()" id="startStopBtn">▶️ Démarrer</button>
         <button onclick="nextLevel()">⏭️ Suivant</button>
-        <button onclick="resetTimer()">🔄 Réinitialiser</button>
+        <button onclick="resetAll()">🔄 Réinitialiser</button>
       </div>
       <div id="loading" style="margin-top: 1em; color: #aaa; display: none;">Chargement de la structure...</div>
     </div>
@@ -49,16 +49,15 @@
     </div>
 
     <div id="tab-joueurs" class="tab-content">
-      <button id="export-app-btn" style="margin-bottom:1em; font-size:1.1em;">Exporter appli JSON</button>
-      <button id="import-app-btn" style="margin-bottom:1em; font-size:1.1em;">Charger appli JSON</button>
-      <input type="file" id="import-app-file" accept=".json" style="display:none;">
+      <button onclick="importJoueursCSV()">Importer joueurs</button>
       <div id="players-table-container"></div>
     </div>
 
     <div id="tab-classement" class="tab-content">
-      <div id="classement-container">
-        <p>Classement à venir…</p>
-      </div>
+      <!-- Onglet Classement -->
+      <button onclick="syncJoueursToClassement()">Sync joueurs</button>
+      <button onclick="assignSeats()">Assigner sièges</button>
+      <div id="classement-container"></div>
     </div>
     
   </div>
