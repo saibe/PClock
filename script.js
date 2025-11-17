@@ -11,6 +11,9 @@ let selectedPlayersIndexes = [];
 let playerAssignments = []; // [{index, table, seat}]
 let classementData = [];
 let classementSort = { column: 'rank', asc: true };
+let currentRank = 1;
+// Variable globale pour gérer le joueur en cours d'élimination
+let joueurAEliminerWinamax = null;
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -54,14 +57,18 @@ function syncJoueursToClassement() {
     nom: j.nom,
     prenom: j.prenom,
     mpla: j.mpla,
-    round: '', heure: '', killer: '', out: false, rank: '', table: '', siege: '', paye: false
+    round: '', heure: '', killer: '', out: false, rank: '', table: '', seat: '', actif: false
   }));
+
+  // Réinitialise la liste des anciennes assignations
+  playerAssignments = [];
+
   renderClassement();
-  renderTablesFromPlayers();
+  renderTablesPlan();
   exportAppToJSON();
 }
 
-function importJoueursCSV() {
+function importPlayersCSV() {
   fetch(PLAYERS_CSV_URL)
     .then(response => response.text())
     .then(csvText => {
@@ -159,77 +166,6 @@ async function loadStructure() {
   }
 }
 
-async function loadPlayers() {
-  try {
-    const response = await fetch(PLAYERS_CSV_URL);
-    if (!response.ok) throw new Error('Erreur de chargement du CSV joueurs');
-    const csvText = await response.text();
-    const lines = csvText.trim().split('\n');
-    // On ignore les 4 premières lignes
-    let data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
-
-    // Génère le tableau HTML
-    let html = '<table id="players-table"><thead><tr>';
-    html += '<th></th><th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th><th>Table</th><th>Siège</th>';
-    html += '</tr></thead><tbody>';
-    data.forEach((row, idx) => {
-      if (row.length >= 7) {
-        // Case cochée si le joueur est dans classementData
-        const winamax = row[6];
-        const checked = classementData.some(p => p.winamax === winamax) ? 'checked' : '';
-        // Affiche l'assignation restaurée
-        let tableCell = '', seatCell = '';
-        const p = classementData.find(p => p.winamax === winamax);
-        if (p) {
-          tableCell = p.table || '';
-          seatCell = p.siege || '';
-        }
-        html += `<tr>
-          <td><input type="checkbox" class="player-checkbox" data-index="${idx}" ${checked}></td>
-          <td>${row[0]}</td>
-          <td>${row[1]}</td>
-          <td>${row[5]}</td>
-          <td>${row[6]}</td>
-          <td>${tableCell}</td>
-          <td>${seatCell}</td>
-        </tr>`;
-      }
-    });
-    html += '</tbody></table>';
-
-    document.getElementById('players-table-container').innerHTML = html;
-
-    // Met à jour la sélection à chaque changement de case
-    document.querySelectorAll('.player-checkbox').forEach(cb => {
-      cb.addEventListener('change', function() {
-        const idx = parseInt(this.getAttribute('data-index'));
-        if (this.checked) {
-          if (!selectedPlayersIndexes.includes(idx)) selectedPlayersIndexes.push(idx);
-        } else {
-          selectedPlayersIndexes = selectedPlayersIndexes.filter(i => i !== idx);
-        }
-        if (typeof renderClassement === 'function') renderClassement();
-      });
-    });
-
-    // Ajoute le comportement de clic sur la ligne pour cocher/décocher
-    document.querySelectorAll('#players-table tbody tr').forEach(tr => {
-      tr.addEventListener('click', function(e) {
-        if (e.target.type === 'checkbox') return;
-        const checkbox = this.querySelector('input[type="checkbox"]');
-        if (checkbox) {
-          checkbox.checked = !checkbox.checked;
-          checkbox.dispatchEvent(new Event('change'));
-        }
-      });
-    });
-  } catch (e) {
-    document.getElementById('tab-joueurs').innerHTML = '<p style="color:red;">Erreur de chargement des joueurs : ' + e.message + '</p>';
-  }
-
-  exportAppToJSON();
-}
-
 function updateDisplay() {
   if (!levels || levels.length === 0) return;
   document.getElementById('level').textContent = levels[currentLevel].label;
@@ -299,7 +235,6 @@ function nextLevel() {
     currentLevel++;
     timeLeft = levels[currentLevel].duration;
     stopTimer();
-    playMultiToneAlert();
     updateDisplay();
   }
 }
@@ -309,7 +244,6 @@ function prevLevel() {
     currentLevel--;
     timeLeft = levels[currentLevel].duration;
     stopTimer();
-    playMultiToneAlert();
     updateDisplay();
   }
 }
@@ -328,6 +262,9 @@ function startTimer() {
     timerInterval = setInterval(() => {
       if (timeLeft > 0) {
         timeLeft--;
+        if (timeLeft === 5) {
+            playMultiToneAlert();
+        }
         updateDisplay();
       } else {
         nextLevel();
@@ -421,9 +358,9 @@ function resetAll() {
 
   // 5. Rafraîchit l’affichage
   updateDisplay();
-  loadPlayers();
+  importPlayersCSV();
   renderClassement();
-  renderTablesFromPlayers();
+  renderTablesPlan();
   exportAppToJSON();
 }
 
@@ -433,10 +370,10 @@ function showTab(tab) {
   document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'joueurs') {
-    loadPlayers();
+    //importPlayersCSV();
   }
   if (tab === 'tables') {
-    renderTablesFromPlayers();
+    renderTablesPlan();
   }
   if (tab === 'classement') {
     renderClassement();
@@ -459,7 +396,6 @@ function renderStructureTable() {
 }
 
 restoreAppFromLocalStorage();
-loadPlayers();
 loadStructure();
 
 // Edition du titre
@@ -512,183 +448,257 @@ function sortClassement(column) {
 }
 
 function renderClassement() {
-  const classementAffiche = [...classementData].sort((a, b) => {
-    const col = classementSort.column;
-    let av = a[col], bv = b[col];
-    if (col === 'rank' || col === 'table' || col === 'siege') {
-      av = av ? parseInt(av) : 0;
-      bv = bv ? parseInt(bv) : 0;
-    }
-    if (col === 'out') {
-      av = !!av;
-      bv = !!bv;
-    }
-    if (av === bv) return 0;
-    if (classementSort.asc) {
-      return av > bv ? 1 : -1;
-    } else {
-      return av < bv ? 1 : -1;
-    }
+  // 1. Triage des données (NOUVELLE LOGIQUE)
+  classementData.sort((a, b) => {
+      // ----------------------------------------------------
+      // 1. INSCRITS (actif: true) en haut, NON-INSCRITS en bas
+      // ----------------------------------------------------
+      const actifA = a.actif ? 1 : 0;
+      const actifB = b.actif ? 1 : 0;
+      if (actifA !== actifB) {
+          return actifB - actifA; // Descendant (Inscrit avant Non-inscrit)
+      }
+
+      // Si les deux sont INACTIFS (Non-inscrit)
+      if (actifA === 0) {
+          // 2. Tri par RANK (croissant) pour les joueurs éliminés
+          const isRankedA = a.rank !== null && a.rank !== '';
+          const isRankedB = b.rank !== null && b.rank !== '';
+
+          // Les joueurs classés (avec un rank) viennent avant les non-classés
+          if (isRankedA !== isRankedB) {
+              return isRankedB - isRankedA; // Classé avant Non-classé
+          }
+
+          if (isRankedA) {
+              // Les deux sont classés, trier par rank croissant (1, 2, 3...)
+              const rankA = parseInt(a.rank);
+              const rankB = parseInt(b.rank);
+              return rankA - rankB;
+          }
+          
+          // Dernier critère pour les Non-inscrits sans rank : MPLA
+          if (a.mpla < b.mpla) return -1;
+          if (a.mpla > b.mpla) return 1;
+          return 0;
+      }
+
+
+      // ----------------------------------------------------
+      // Si les deux sont ACTIFS (Inscrit)
+      // ----------------------------------------------------
+      
+      // 3. Tri par TABLE (croissant)
+      const tableA = parseInt(a.table) || Infinity;
+      const tableB = parseInt(b.table) || Infinity;
+      if (tableA !== tableB) {
+          return tableA - tableB;
+      }
+
+      // 4. Tri par SIÈGE (croissant)
+      const seatA = parseInt(a.seat) || Infinity;
+      const seatB = parseInt(b.seat) || Infinity;
+      return seatA - seatB;
   });
 
-  // Liste des joueurs encore en jeu (non éliminés)
-  const stillIn = classementAffiche.filter(p => !p.out).map(p => p.winamax);
+  let html = '<table id="classement-table"><thead><tr>';
+  
+  // 2. Génération des en-têtes de colonnes dans l'ordre demandé
+  html += `
+      <th>Inscrit</th>
+      <th>Rank</th>
+      <th>MPLA</th>
+      <th>Table</th>
+      <th>Siège</th>
+      <th>Round OUT</th>
+      <th>Heure OUT</th>
+      <th>Killer</th>
+      <th>In/Out</th>               `;
+  html += '</tr></thead><tbody>';
+  
+  classementData.forEach(p => {
+      const isElimine = p.rank !== null && p.rank !== '';
+      
+      // 1. Bouton Action : Afficher OUT uniquement si le joueur n'est pas éliminé
+      actionContent = !isElimine 
+          ? `<button class="out-btn" onclick="toggleOutClassement('${p.winamax}')">OUT</button>` 
+          : ''; // Vide si le joueur est éliminé (OUT)
 
-  // Génère le tableau HTML
-  let html = `<table id="classement-table">
-    <thead>
-      <tr>
-        <th onclick="sortClassement('paye')">paye</th>
-        <th onclick="sortClassement('rank')">Rank</th>
-        <th onclick="sortClassement('winamax')">Winamax</th>
-        <th onclick="sortClassement('table')">Table</th>
-        <th onclick="sortClassement('siege')">Siège</th>
-        <th onclick="sortClassement('out')">Out</th>
-        <th onclick="sortClassement('round')">Round</th>
-        <th onclick="sortClassement('heure')">Heure</th>
-        <th onclick="sortClassement('killer')">Killer</th>
-      </tr>
-    </thead>
-    <tbody>
-  `;
-  classementAffiche.forEach((p, i) => {
-    // Trouver l'assignation table/siège par winamax
-    let tableCell = '', seatCell = '';
-    const assign = playerAssignments.find(a => a.winamax === p.winamax);
-    if (assign) {
-      tableCell = (assign.table !== undefined && !isNaN(assign.table)) ? assign.table : '';
-      seatCell = (assign.seat !== undefined && !isNaN(assign.seat)) ? assign.seat : '';
-    }
+      // 2. Colonne Killer : Liste déroulante des joueurs encore IN
+      let killerContent = p.killer || '';
+      
+      if (isElimine) {
+          // Filtrer les joueurs encore IN (actif: true ET rank null)
+          const joueursEnJeu = classementData.filter(j => j.actif && (j.rank === null || j.rank === ''));
+          
+          killerContent = `<select onchange="updateClassementCell('${p.winamax}', 'killer', this.value)">`;
+          killerContent += `<option value="">-- Choisir Killer --</option>`;
+          
+          // Ajouter les joueurs en jeu à la liste
+          joueursEnJeu.forEach(j => {
+              const isSelected = j.winamax === p.killer ? 'selected' : '';
+              killerContent += `<option value="${j.winamax}" ${isSelected}>${j.winamax}</option>`;
+          });
+          killerContent += `</select>`;
+      }
+      
+      const isOut = p.rank !== null && p.rank !== '';
+      const rankDisplay = isOut ? p.rank : '';
 
-    // Pour la colonne killer, on crée une liste déroulante
-    let killerSelect = `<select onchange="updateClassementCell('${p.winamax}','killer',this.value)" ${p.out ? '' : 'disabled'}>`;
-    killerSelect += `<option value="">--</option>`;
-    stillIn
-      .filter(w => w !== p.winamax)
-      .forEach(w => {
-        killerSelect += `<option value="${w}"${p.killer === w ? ' selected' : ''}>${w}</option>`;
-      });
-    killerSelect += '</select>';
+      // Contenu de la colonne 'Actif' (Gris/Vert)
+      // Note: Vous devrez ajouter une fonction 'toggleActif' et un 'onclick' si vous voulez que ce soit un vrai toggle
+      const isActif = p.actif;
+      const toggleClass = isActif ? 'active' : 'inactive';
+      if(!isActif) {
+        actionContent ='';
+      }
+      
+      const actifContent = `
+          <div class="toggle-switch ${toggleClass}" onclick="toggleActif('${p.winamax}')">
+              <span class="switch-slider"></span>
+              <span class="switch-label">${isActif ? 'Inscrit' : ''}</span>
+          </div>
+      `;
 
-    html += `<tr>
-      <td><input type="checkbox" ${p.paye ? 'checked' : ''} onchange="togglePaye('${p.winamax}')"></td>
-      <td>${p.rank || ''}</td>
-      <td>${p.winamax}</td>
-      <td>${tableCell}</td>
-      <td>${seatCell}</td>
-      <td><input type="checkbox" ${p.out ? 'checked' : ''} onchange="toggleOutClassement('${p.winamax}')"></td>
-      <td>${p.round}</td>
-      <td>${p.heure}</td>
-      <td>${killerSelect}</td>
-    </tr>`;
+      const seatDisplay = p.seat || ''; 
+      
+      html += `
+          <tr class="${isElimine ? 'out-row' : ''}">
+            <td>${actifContent}</td>     
+            <td>${rankDisplay}</td>
+            <td>${p.mpla || ''}</td>
+            <td>${p.table || ''}</td>
+            <td>${seatDisplay}</td>
+            <td>${p.round || ''}</td>
+            <td>${p.heure || ''}</td>
+            <td>${killerContent}</td>
+            <td>${actionContent}</td>
+          </tr>
+      `;
   });
+  
   html += '</tbody></table>';
   document.getElementById('classement-container').innerHTML = html;
+  
+  exportAppToJSON();
 }
 
-function togglePaye(winamax) {
-  const p = classementData.find(p => p.winamax === winamax);
-  if (p) {
-    p.paye = !p.paye;
-    exportAppToJSON();
+function toggleActif(winamax) {
+    winamax = String(winamax); 
+    const index = classementData.findIndex(p => p.winamax === winamax);
+    if (index === -1) return;
+
+    const player = classementData[index];
+    
+    // 1. Inverser le statut actif
+    player.actif = !player.actif; 
+
+    if (!player.actif) {
+        // 2. Si le joueur devient inactif (désinscrit), il perd son siège
+        player.table = null;
+        player.seat = null;
+    } 
+    
+    // 3. Si le joueur était éliminé, il doit rester éliminé s'il redevient actif
+    // Mais s'il était actif et qu'on le rend inactif, il ne doit pas se classer
+    
+    // Si un joueur devient Inactif ET qu'il était actif (rank = null), il ne doit pas être affecté au classement
+    // Si un joueur devient actif ET qu'il était OUT, il garde son rank. (Ce n'est pas le rôle de toggleActif de le remettre IN)
+    
+    // 4. Mettre à jour l'affichage et sauvegarder
     renderClassement();
-  }
+    renderTablesPlan(); // Mise à jour du plan de tables
+    exportAppToJSON();
 }
 
 function toggleOutClassement(winamax) {
-  const index = classementData.findIndex(p => p.winamax === winamax);
-  if (index === -1) return;
-  
-  // 1. Met à jour l'état "out" et les infos d'élimination
-  const wasOut = classementData[index].out;
-  classementData[index].out = !wasOut;
+    winamax = String(winamax); 
+    const index = classementData.findIndex(p => p.winamax === winamax);
+    if (index === -1) return;
 
-  if (classementData[index].out) {
-    // Remplit round et heure à l'élimination
-    const now = new Date();
-    const heureStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const roundStr = document.getElementById('level')?.textContent || '';
-    classementData[index].round = roundStr;
-    classementData[index].heure = heureStr;
+    // Détermine le nombre total de joueurs INscrits (actif: true), y compris ceux qui sont déjà éliminés.
+    const N_registered = classementData.filter(p => p.actif === true).length;
 
-    // Calcule le rang : nombre de joueurs non out avant ce clic
-    const stillIn = classementData.filter(p => !p.out).length;
-    classementData[index].rank = stillIn;
-  } else {
-    // Si on décoche "out", on vide round, heure, killer, rank, table, siege
-    classementData[index].round = '';
-    classementData[index].heure = '';
-    classementData[index].killer = '';
-    classementData[index].rank = '';
-    classementData[index].table = '';
-    classementData[index].siege = '';
-  }
+    if (classementData[index].rank === null || classementData[index].rank === '') {
+        // ===================================
+        // PASSE DE IN à OUT (Élimination)
+        // ===================================
+        
+        // Compter le nombre de joueurs déjà classés parmi les inscrits.
+        const rankedCount = classementData.filter(p => p.actif === true && p.rank !== null && p.rank !== '').length;
 
-  // 2. Met à jour playerAssignments (supprime l'assignation du joueur out)
-  playerAssignments = playerAssignments.filter(a => a.winamax !== winamax);
+        // 1. Calculer le rang (place finale)
+        // Le rang est la place restante (N_registered - Nombre déjà éliminé)
+        classementData[index].rank = N_registered - rankedCount; 
+        
+        // 2. Remplir les colonnes heure et round
+        const now = new Date();
+        classementData[index].heure = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) 
+                                    + ' ' 
+                                    + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        classementData[index].round = currentLevel; 
 
-  // 3. Rééquilibrage des tables avec la fonction fusionnée
-  const joueurs = classementData
-    .filter(p => !p.out)
-    .map(p => ({ winamax: p.winamax }));
+        // 3. Le joueur RESTE actif: true 
+        
+        // 4. Retirer l'assignation de table/siège
+        classementData[index].table = null;
+        classementData[index].seat = null;
+        
+    } else {
+        // ===================================
+        // PASSE DE OUT à IN (Réintégration)
+        // ===================================
 
-  const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+        // 1. Vider les données d'élimination
+        classementData[index].rank = null;
+        classementData[index].heure = '';
+        classementData[index].round = '';
+        classementData[index].killer = ''; 
+        
+        // 2. Le joueur redevient actif (si ce n'est pas déjà le cas)
+        classementData[index].actif = true;
 
-  const oldAssignments = playerAssignments.map(a => ({
-    winamax: a.winamax,
-    table: a.table,
-    siege: a.seat
-  }));
+        // 3. Récalculer tous les ranks des joueurs éliminés pour corriger la séquence
+        // Utilise N_registered pour la base du re-ranking.
+        const joueursARanker = classementData.filter(p => p.rank !== null && p.rank !== '').sort((a, b) => parseInt(b.rank) - parseInt(a.rank));
 
-  const { assignments, changes, tablesCassees } = equilibrerTables(joueurs, perTable, oldAssignments);
-
-  // 4. Applique les nouvelles assignations à classementData et playerAssignments
-  assignments.forEach(a => {
-    let p = classementData.find(p => p.winamax === a.winamax);
-    if (p) {
-      p.table = a.table;
-      p.siege = a.seat;
+        let rankCounter = N_registered; 
+        joueursARanker.forEach(p => {
+            p.rank = rankCounter; 
+            rankCounter--;
+        });
     }
-  });
-  playerAssignments = assignments.map(a => ({
-    winamax: a.winamax,
-    table: a.table,
-    seat: a.seat
-  }));
+    
+    // 5. Équilibrer les tables (si un joueur a quitté un siège ou doit en être réassigné)
+    const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+    // On prend seulement les joueurs ACITFS/INSCRITS sans rang pour l'équilibrage
+    const joueursActifs = classementData.filter(p => p.actif && (p.rank === null || p.rank === '')).map(p => ({ winamax: p.winamax }));
+    classementData.forEach(p => {
+        if (p.actif && (p.rank === null || p.rank === '')) {
+            p.table = null;
+            p.seat = null;
+        }
+    });
+    playerAssignments = playerAssignments.filter(assignment => 
+        joueursActifs.some(j => j.winamax === assignment.winamax)
+    );
+    const { assignments, changes } = equilibrerTables(joueursActifs, perTable, playerAssignments);
+    
+    playerAssignments = assignments; 
+    assignments.forEach(a => {
+        const p = classementData.find(j => j.winamax === a.winamax);
+        if (p) {
+            p.table = a.table;
+            p.seat = a.seat;
+        }
+    });
 
-  // 5. Affiche la popup si besoin
-  if (tablesCassees.length > 0 || changes.length > 0) {
-    let html = '<h2>Changements d\'assignation</h2>';
-    if (tablesCassees.length > 0) {
-      html += '<div style="margin-bottom:1em;">';
-      tablesCassees.forEach(tc => {
-        html += `<div style="color:#ffb300; font-weight:bold;font-size:2em;">La table ${tc} casse</div>`;
-      });
-      html += '</div>';
-    }
-    if (changes.length > 0) {
-      html += `
-        <table style="margin:auto; background:#222; color:#fff; border-radius:8px; min-width:50%;">
-          <tbody>
-      `;
-      changes.forEach(c => {
-        html += `
-          <tr>
-            <td style="font-weight:bold; padding:0.3em 1em;">${c.winamax}</td>
-            <td style="padding:0.3em 1em;">Table ${c.from.table} Siège ${c.from.siege}</td>
-            <td style="padding:0.3em 1em;">Table ${c.to.table} Siège ${c.to.siege}</td>
-          </tr>
-        `;
-      });
-      html += '</tbody></table>';
-    }
-    showPopup(html);
-  }
+    if (changes.length > 0) { showPopup(changes); }
 
-  // 6. Rafraîchit l'affichage
-  renderClassement();
-  renderTablesFromPlayers();
-  exportAppToJSON();
+    // 6. Mettre à jour l'affichage
+    renderClassement();
+    renderTablesPlan(); 
+    exportAppToJSON();
 }
 
 function getClassementData() {
@@ -710,12 +720,14 @@ function getClassementData() {
  * Assigne et équilibre les tables en minimisant les déplacements et en fermant les tables si besoin.
  * @param {Array} joueurs - Liste des joueurs à assigner [{winamax, ...}]
  * @param {number} perTable - Nombre max de joueurs par table
- * @param {Array} oldAssignments - Assignations précédentes [{winamax, table, siege}]
+ * @param {Array} oldAssignments - Assignations précédentes [{winamax, table, seat}]
  * @returns {Object} { assignments: [...], changes: [...], tablesCassees: [...] }
  */
 function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   const totalPlayers = joueurs.length;
-  const nbTables = Math.ceil(totalPlayers / perTable);
+  const nbTables = Math.max(1, Math.ceil(totalPlayers / perTable));
+
+  console.log("nbTables: " + nbTables);
 
   // Regrouper les anciens assignments par table
   let oldByTable = {};
@@ -725,7 +737,7 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   });
 
   // 1. Si le nombre de tables diminue, on ferme la table la moins remplie
-  let oldTables = Array.from(new Set(oldAssignments.map(a => a.table)));
+  let oldTables = Array.from(new Set(oldAssignments.map(a => a.table))).filter(t => !isNaN(Number(t)));
   let tablesCassees = [];
   let joueursToReassign = [];
   if (oldTables.length > nbTables) {
@@ -738,6 +750,9 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
       delete oldByTable[tc];
     });
   }
+  console.log("oldTables:" + oldTables);
+  console.log("tablesCassees:" + tablesCassees);
+  console.log("joueursToReassign:" + joueursToReassign);
 
   // 2. Génère la liste des tables restantes
   let tableNumbers;
@@ -751,6 +766,8 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     }
   }
 
+  console.log("tableNumbers:" + tableNumbers);
+
   // 3. Place les joueurs à leur table/siège d'origine si possible (hors tables cassées)
   let assignments = [];
   let usedWinamax = new Set();
@@ -760,14 +777,14 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   tableNumbers.forEach(tableNum => {
     let oldTable = oldByTable[tableNum] || [];
     oldTable.forEach(a => {
-      if (joueurs.find(j => j.winamax === a.winamax) && !usedSeatsByTable[tableNum].has(a.siege || a.seat)) {
+      if (joueurs.find(j => j.winamax === a.winamax) && !usedSeatsByTable[tableNum].has(a.seat)) {
         assignments.push({
           winamax: a.winamax,
           table: tableNum,
-          seat: a.siege || a.seat || 1
+          seat: a.seat || 1
         });
         usedWinamax.add(a.winamax);
-        usedSeatsByTable[tableNum].add(a.siege || a.seat || 1);
+        usedSeatsByTable[tableNum].add(a.seat || 1);
       }
     });
   });
@@ -784,11 +801,12 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
       table: destTable,
       seat: s
     });
+    console.log("assignments:" + assignments);
     usedWinamax.add(j.winamax);
     usedSeats.add(s);
   });
 
-  // 5. Équilibrage strict : on déplace le minimum de joueurs pour que l’écart max soit 1
+// 5. Équilibrage strict : on déplace le minimum de joueurs pour que l’écart max soit 1
   let changed = true;
   while (changed) {
     // Calcule la taille de chaque table
@@ -815,39 +833,51 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     assignments = assignments.filter(a => a.winamax !== toMove.winamax);
     assignments.push({
       winamax: toMove.winamax,
-      table: tableNum,
+      table: tMin, // CORRECTION: Utiliser tMin
       seat: newSeat
     });
-    usedSeatsByTable[tMin].add(newSeat);
+    usedSeatsByTable[tMin].add(newSeat); 
     usedSeatsByTable[tMax].delete(toMove.seat);
+    // Note : Il faudrait aussi supprimer le joueur déplacé de usedWinamax.
+    // L'algorithme actuel repose sur la mise à jour des 'assignments', ce qui fonctionne.
     // On boucle jusqu'à équilibre
   }
 
-  // 6. Pour les nouveaux joueurs (jamais assignés), on leur attribue le premier siège libre sur une table ouverte
-  tableNumbers.forEach(tableNum => {
-    let usedSeats = usedSeatsByTable[tableNum];
-    for (let s = 1; assignments.filter(a => a.table === tableNum).length < perTable; s++) {
-      if (usedSeats.has(s)) continue;
-      let nextJoueur = joueurs.find(j => !assignments.find(a => a.winamax === j.winamax));
-      if (!nextJoueur) break;
-      assignments.push({
-        winamax: nextJoueur.winamax,
-        table: tableNum,
-        seat: s
-      });
-      usedSeats.add(s);
-    }
+  console.log("assignments(apres section 5):" + assignments);
+
+  // 6. Pour les joueurs non encore assignés, on leur attribue le premier siège libre sur une table ouverte
+  let unassignedJoueurs = joueurs.filter(j => !assignments.find(a => a.winamax === j.winamax));
+
+  unassignedJoueurs.forEach(j => {
+    // Trouvez la table la moins remplie parmi les tables ouvertes
+    let destTable = tableNumbers
+      .sort((a, b) => assignments.filter(x => x.table === a).length - assignments.filter(x => x.table === b).length)[0];
+
+    // Cherchez le premier siège libre sur cette table
+    let usedSeats = usedSeatsByTable[destTable];
+    let s = 1;
+    while (usedSeats.has(s)) s++;
+    
+    // Assignez le joueur
+    assignments.push({
+      winamax: j.winamax,
+      table: destTable,
+      seat: s
+    });
+    usedSeatsByTable[destTable].add(s);
   });
 
+  console.log("assignments(apres section 6):" + assignments);
+  
   // 7. Changements d'assignation (pour la popup)
   let changes = [];
   assignments.forEach(a => {
     let old = oldAssignments.find(o => o.winamax === a.winamax);
-    if (!old || old.table !== a.table || (old.siege || old.seat) !== a.seat) {
+    if (!old || old.table !== a.table || old.seat !== a.seat) {
       changes.push({
         winamax: a.winamax,
-        from: old ? { table: old.table, siege: old.siege || old.seat } : { table: '-', siege: '-' },
-        to: { table: a.table, siege: a.seat }
+        from: old ? { table: old.table, seat: old.seat } : { table: '-', seat: '-' },
+        to: { table: a.table, seat: a.seat }
       });
     }
   });
@@ -870,21 +900,22 @@ function syncSelectedPlayersIndexes() {
 }
 
 function assignSeats() {
-  // Prend uniquement les joueurs payés
-  const joueurs = classementData.filter(p => p.paye).map(p => ({ winamax: p.winamax }));
+  // Prend uniquement les joueurs actif
+  const joueurs = classementData.filter(p => p.actif).map(p => ({ winamax: p.winamax }));
   if (joueurs.length === 0) {
-    alert("Aucun joueur payé !");
+    alert("Aucun joueur inscrit !");
     return;
   }
 
   // Nombre de joueurs max par table
   const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+  console.log("perTable: " + perTable);
 
   // Construit oldAssignments à partir de classementData pour les joueurs payés
   const oldAssignments = joueurs.map(j => {
     const p = classementData.find(p => p.winamax === j.winamax);
-    return (p && p.table && p.siege && !isNaN(parseInt(p.table)) && !isNaN(parseInt(p.siege)))
-      ? { winamax: p.winamax, table: parseInt(p.table), seat: parseInt(p.siege) }
+    return (p && p.table && p.seat && !isNaN(parseInt(p.table)) && !isNaN(parseInt(p.seat)))
+      ? { winamax: p.winamax, table: parseInt(p.table), seat: parseInt(p.seat) }
       : { winamax: j.winamax };
   });
 
@@ -896,11 +927,11 @@ function assignSeats() {
     let p = classementData.find(p => p.winamax === a.winamax);
     if (p) {
       p.table = a.table;
-      p.siege = a.seat;
+      p.seat = a.seat;
     } else {
       classementData.push({
         winamax: a.winamax,
-        round: '', heure: '', killer: '', out: false, rank: '', table: a.table, siege: a.seat, paye: true
+        round: '', heure: '', killer: '', out: false, rank: '', table: a.table, seat: a.seat, actif: true
       });
     }
   });
@@ -913,26 +944,57 @@ function assignSeats() {
   }));
 
   renderClassement();
-  renderTablesFromPlayers();
+  renderTablesPlan();
   exportAppToJSON();
 }
 
-function showPopup(html) {
-  document.getElementById('popup-modal-body').innerHTML = html;
-  document.getElementById('popup-modal').style.display = 'flex';
-}
 function closePopup() {
   document.getElementById('popup-modal').style.display = 'none';
 }
 
-function renderTablesFromPlayers() {
+function showPopup(changes) {
+    const modal = document.getElementById('popup-modal');
+    const contentList = document.getElementById('popup-modal-body');
+    
+    // Si l'élément de contenu n'existe pas, on arrête
+    if (!modal || !contentList) {
+        console.error("Éléments de la modale non trouvés !");
+        return;
+    }
+
+    let htmlContent = '<h2 style="color:#ffb300;">Changements de Sièges</h2>';
+    htmlContent += '<ul style="list-style: none; padding-left: 0;">';
+
+    changes.forEach(c => {
+        const playerName = c.winamax;
+        const fromTable = c.from.table !== '-' ? `table ${c.from.table} siège ${c.from.seat}` : 'N/A';
+        const toTable = `table ${c.to.table} siège ${c.to.seat}`;
+        
+    htmlContent += `
+        <li style="display: flex;">
+            <strong style="flex: 1 1 35%; text-align: left; color: #ffb300;">${playerName}</strong> 
+            <span style="flex: 1 1 30%; text-align: center; color: #aaa;">${fromTable}</span> 
+            <span style="flex: 1 1 35%; text-align: right; font-weight: bold;">${toTable}</span>
+        </li>
+    `;
+
+    });
+
+    htmlContent += '</ul>';
+
+    // Injecter le contenu et rendre la modale visible
+    contentList.innerHTML = htmlContent;
+    modal.style.display = 'flex'; // Utiliser 'flex' si le style est positionné pour centrer
+}
+
+function renderTablesPlan() {
   // On utilise classementData pour récupérer les joueurs avec une table et un siège
   // On ne prend que les joueurs non éliminés et qui ont une table/siège
   let players = classementData
-    .filter(p => !p.out && p.table && p.siege)
+    .filter(p => !p.out && p.table && p.seat)
     .map(p => ({
       table: parseInt(p.table),
-      seat: parseInt(p.siege),
+      seat: parseInt(p.seat),
       winamax: p.winamax
     }));
 
@@ -978,31 +1040,6 @@ function renderTablesFromPlayers() {
   document.getElementById('tables-plan').innerHTML = html;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  // Restauration automatique depuis localStorage
-  restoreAppFromLocalStorage();
-
-  // Bouton "Charger JSON" (restauration manuelle)
-  const loadBtn = document.getElementById('load-json-btn');
-  const fileInput = document.getElementById('load-json-file');
-  if (loadBtn && fileInput) {
-    loadBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', function() {
-      const file = this.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          importAppFromJSON(e.target.result); // Utilise la fonction d'import globale
-        } catch (err) {
-          alert("Erreur lors du chargement du fichier JSON.");
-        }
-      };
-      reader.readAsText(file);
-    });
-  }
-});
-
 // Fonction pour restaurer la sélection et l'assignation depuis le JSON
 function restorePlayersFromJSON(joueurs) {
   // On reconstruit selectedPlayersIndexes et playerAssignments
@@ -1010,17 +1047,17 @@ function restorePlayersFromJSON(joueurs) {
   playerAssignments = [];
   joueurs.forEach((p, idx) => {
     if (p.checked) selectedPlayersIndexes.push(idx);
-    if (p.table && p.siege) {
+    if (p.table && p.seat) {
       playerAssignments.push({
         index: idx,
         table: parseInt(p.table),
-        seat: parseInt(p.siege)
+        seat: parseInt(p.seat)
       });
     }
   });
   // Recharge le tableau des joueurs et le plan des tables
-  loadPlayers();
-  if (typeof renderTablesFromPlayers === 'function') renderTablesFromPlayers();
+  importPlayersCSV();
+  if (typeof renderTablesPlan === 'function') renderTablesPlan();
   renderClassement();
 }
 
@@ -1055,8 +1092,8 @@ function restoreAppFromLocalStorage() {
 
     // Recharge l’affichage
     updateDisplay();
-    loadPlayers();
-    if (typeof renderTablesFromPlayers === 'function') renderTablesFromPlayers();
+    importPlayersCSV();
+    if (typeof renderTablesPlan === 'function') renderTablesPlan();
     renderClassement();
 
     // Redémarre le timer si besoin
@@ -1068,42 +1105,62 @@ function restoreAppFromLocalStorage() {
 }
 
 function exportAppToJSON() {
-  const structure = levels;
-  const horloge = {
-    currentLevel,
-    timeLeft,
-    running,
-    baseFontSize
-  };
-  const classement = classementData.map(p => ({ ...p }));
-  const joueurs = Array.from(document.querySelectorAll('#players-table tbody tr')).map(tr => {
-    const tds = tr.querySelectorAll('td');
-    return {
-      nom: tds[1]?.textContent.trim(),
-      prenom: tds[2]?.textContent.trim(),
-      mpla: tds[3]?.textContent.trim(),
-      winamax: tds[4]?.textContent.trim(),
-      table: tds[5]?.textContent.trim(),
-      siege: tds[6]?.textContent.trim(),
-      checked: tr.querySelector('input[type="checkbox"]')?.checked || false
+    // Collecte de toutes les données importantes de l'application
+    const appData = {
+        levels: levels,
+        horloge: { 
+            currentLevel: currentLevel,
+            timeLeft: timeLeft,
+            running: running,
+            baseFontSize: baseFontSize, 
+        },
+        structureTitle: structureTitle,
+        playerAssignments: playerAssignments,
+        classementData: classementData,
+        currentRank: currentRank, 
+        joueurAEliminerWinamax: joueurAEliminerWinamax,
+        selectedPlayersIndexes: selectedPlayersIndexes,
+        // ... ajoutez d'autres variables globales importantes si nécessaire
     };
-  });
+    const jsonString = JSON.stringify(appData);
+    
+    // Sauvegarde dans le stockage local du navigateur
+    localStorage.setItem('pokerAppData', jsonString);
 
-  const appState = {
-    structure,
-    horloge,
-    selectedPlayersIndexes,
-    playerAssignments: playerAssignments.map(a => ({ ...a })),
-    joueurs,
-    classement,
-    structureTitle: document.getElementById('structure-title')?.textContent || ''
-  };
+    // Note: Si vous souhaitez TOUJOURS conserver l'export fichier pour un backup manuel,
+    // ajoutez ici le code de téléchargement de fichier que vous aviez. Sinon, il n'est plus nécessaire.
+    console.log("Données sauvegardées automatiquement dans localStorage.");
+}
 
-  localStorage.setItem('poker_app_export', JSON.stringify(appState));
+function restoreAppFromLocalStorage() {
+    const jsonString = localStorage.getItem('pokerAppData');
+
+    if (jsonString) {
+        console.log("Restauration des données depuis localStorage...");
+        // importAppFromJSON prend la chaîne JSON et met à jour l'état de l'application
+        importAppFromJSON(jsonString); 
+    } else {
+        console.log("Aucune donnée trouvée dans localStorage. Initialisation standard.");
+        // Si aucune sauvegarde n'existe, on charge les joueurs depuis le CSV
+        importPlayersCSV(); 
+        // Et on affiche le classement initial
+        renderClassement();
+        renderTablesPlan();
+        updateDateTime(); // Initialise l'horloge
+    }
 }
 
 function importAppFromJSON(json) {
   try {
+    // NOUVELLE LIGNE : Affiche le type et la longueur pour un diagnostic clair
+    console.log("load JSON: Type =", typeof json, "| Longueur =", json ? json.length : 0);
+    
+    // Si 'json' est undefined ou vide, nous arrêtons l'exécution ici
+    if (!json) {
+      alert("Le fichier est vide ou n'a pas pu être lu.");
+      return;
+    }
+
     const appState = typeof json === 'string' ? JSON.parse(json) : json;
     if (appState.structure) levels = appState.structure;
     if (appState.horloge) {
@@ -1119,38 +1176,25 @@ function importAppFromJSON(json) {
       const titleElem = document.getElementById('structure-title');
       if (titleElem) titleElem.textContent = appState.structureTitle;
     }
-    if (appState.classement) {
-      classementData = appState.classement.map(p => ({ ...p }));
+    console.log("appState.classement:" + appState.classementData);
+    console.log("classementData:" + classementData);
+    if (appState.classementData) {
+      classementData = appState.classementData.map(p => ({ ...p }));
     }
+    console.log("appState.classement:" + appState.classementData);
+    console.log("classementData:" + classementData);
 
-    loadPlayers();
+    importPlayersCSV();
     setTimeout(() => {
-      syncSelectedPlayersIndexes();
+//      syncSelectedPlayersIndexes();
       renderClassement();
-      renderTablesFromPlayers();
+      renderTablesPlan();
       updateDisplay();
       if (running) startTimer();
     }, 0);
   } catch (e) {
     alert("Erreur lors de l'import du fichier JSON.");
   }
-}
-
-function renderClassementFromData(classement) {
-  let html = '<table id="classement-table"><thead><tr><th>#</th><th>Nom</th><th>Prénom</th><th>Winamax</th><th>Round</th><th>Heure</th><th>Killer</th></tr></thead><tbody>';
-  classement.forEach((p, i) => {
-    html += `<tr>
-      <td>${i + 1}</td>
-      <td>${p.nom}</td>
-      <td>${p.prenom}</td>
-      <td>${p.winamax}</td>
-      <td contenteditable="true">${p.round}</td>
-      <td contenteditable="true">${p.heure}</td>
-      <td contenteditable="true">${p.killer}</td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
-  document.getElementById('classement-container').innerHTML = html;
 }
 
 function updateClassementCell(winamax, field, value) {
@@ -1161,37 +1205,34 @@ function updateClassementCell(winamax, field, value) {
   }
 }
 
-// Export
 document.addEventListener('DOMContentLoaded', function() {
-  const exportBtn = document.getElementById('export-app-btn');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', function() {
-      exportAppToJSON();
-      const json = localStorage.getItem('poker_app_export');
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'poker_app.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
+  
+  // =========================================================
+  // 1. CHARGEMENT AUTOMATIQUE DE L'ÉTAT (RESTAURATION)
+  // =========================================================
+  // Tente de charger l'état depuis localStorage
+  restoreAppFromLocalStorage();
+  // Si le classement est vide après le chargement, c'est la première exécution.
+  if (classementData.length === 0) {
+    console.log("Classement VIDE: importPlayersCSV");
+    // Appelle la fonction qui charge les joueurs par défaut (via CSV)
+    importPlayersCSV(); 
   }
-  // Import
-  const importBtn = document.getElementById('import-app-btn');
-  const fileInput = document.getElementById('import-app-file');
-  if (importBtn && fileInput) {
-    importBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', function() {
-      const file = this.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        importAppFromJSON(e.target.result);
-      };
-      reader.readAsText(file);
-    });
-  }
+    
+  // Afficher l'état chargé ou initialisé
+/*
+  console.log("==========3============");
+  console.log(localStorage.getItem('pokerAppData'));
+  console.log("=======================");
+*/
+  renderClassement(); 
+/*
+  console.log("==========4============");
+  console.log(localStorage.getItem('pokerAppData'));
+  console.log("=======================");
+*/
+  renderTablesPlan();
+  console.log("==========5============");
+  console.log(localStorage.getItem('pokerAppData'));
+  console.log("=======================");
 });

@@ -296,7 +296,7 @@ body {
 #popup-modal {
   display: none;
   position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
+  top: 0; left: 0; width: 80%; height: 100vh;
   background: #000a;
   z-index: 2000;
   align-items: center;
@@ -308,11 +308,115 @@ body {
   color: #fff;
   padding: 2em 3em;
   border-radius: 1em;
-  min-width: 50vw;   /* min-width à 50% de la largeur de la fenêtre */
-  max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
   text-align: center;
   box-sizing: border-box;
   font-size: 2em;    /* font-size à 2em */
+}
+/* Style pour la ligne d'un joueur éliminé */
+.out-row {
+  background-color: #553333 !important; 
+  opacity: 0.8; 
+}
+
+/* Style pour les boutons IN/OUT dans le classement */
+.out-btn {
+  background-color: #d9534f; /* Rouge pour l'élimination */
+  color: white;
+  border: none;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.in-btn {
+  background-color: #5cb85c; /* Vert pour la réintégration */
+  color: white;
+  border: none;
+  padding: 0.4em 1em;
+  border-radius: 4px;
+  cursor: pointer;
+}
+/* style.css */
+
+/* Conteneur principal du switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 90px; /* Largeur totale du switch */
+  height: 34px; /* Hauteur totale du switch */
+  border-radius: 34px;
+  cursor: pointer;
+  transition: background-color 0.4s;
+  overflow: hidden; /* Empêche l'ombre du slider de déborder lors de l'animation */
+  /* S'assurer qu'il est bien centré et aligné dans la cellule du tableau */
+  margin: 0 auto; 
+}
+
+/* Fond pour l'état actif (Inscrit) */
+.toggle-switch.active {
+  background-color: #5cb85c; /* Vert */
+}
+
+/* Fond pour l'état inactif (Non-inscrit) */
+.toggle-switch.inactive {
+  background-color: #777; /* Gris */
+}
+
+/* Le petit cercle (slider) */
+.switch-slider {
+  position: absolute;
+  content: "";
+  height: 26px; /* Taille du cercle */
+  width: 26px;
+  left: 4px; /* Position de départ (à gauche) */
+  bottom: 4px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.4s; /* Animation du déplacement */
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Déplacement du cercle quand le switch est actif */
+.toggle-switch.active .switch-slider {
+  transform: translateX(56px); /* 90px (largeur) - 26px (slider) - 4px*2 (padding) = 56px environ */
+}
+
+/* Étiquette (texte Inscrit/Non-inscrit) */
+.switch-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-weight: bold;
+  font-size: 0.9em;
+  padding: 0 5px;
+  transition: opacity 0.4s;
+}
+
+/* Positionnement du texte en fonction de l'état */
+.toggle-switch.active .switch-label {
+    left: 10px; /* Texte "Inscrit" à gauche */
+    opacity: 1;
+}
+
+.toggle-switch.inactive .switch-label {
+    right: 10px; /* Texte "Non-inscrit" à droite */
+    opacity: 1;
+}
+
+/* Optionnel: Masquer le texte s'il est trop proche du slider */
+/* .toggle-switch.active .switch-label { display: none; }
+/* .toggle-switch.inactive .switch-label { display: none; } */
+
+/* Styles pour les lignes éliminées */
+.out-row {
+  background-color: #553333 !important; 
+  opacity: 0.8; 
+}
+.out-btn {
+  background-color: #d9534f; /* Rouge pour OUT */
+}
+.in-btn {
+  background-color: #5cb85c; /* Vert pour IN */
 }

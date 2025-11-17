@@ -16,7 +16,7 @@
       <button class="tab-btn active" onclick="showTab('tournoi')">Tournoi</button>
       <button class="tab-btn" onclick="showTab('tables')">Tables</button>
       <button class="tab-btn" onclick="showTab('structure')">Structure</button>
-      <button class="tab-btn" onclick="showTab('joueurs')">Joueurs</button>
+      <button class="tab-btn" onclick="showTab('players')">Joueurs</button>
       <button class="tab-btn" onclick="showTab('classement')">Classement</button>
     </div>
     
@@ -38,8 +38,6 @@
     <div id="tab-tables" class="tab-content">
       <div style="margin-bottom:1em;">
         <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
-        <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
-        <button onclick="assignSeats()" style="font-size:1.1em; margin-left:1em;">Assignation sièges</button>
       </div>
       <div id="tables-plan"></div>
     </div>
@@ -48,14 +46,15 @@
       <div id="structure-table-container"></div>
     </div>
 
-    <div id="tab-joueurs" class="tab-content">
-      <button onclick="importJoueursCSV()">Importer joueurs</button>
+    <div id="tab-players" class="tab-content">
+      <button onclick="importPlayersCSV()">Import players</button>
       <div id="players-table-container"></div>
     </div>
 
     <div id="tab-classement" class="tab-content">
       <!-- Onglet Classement -->
       <button onclick="syncJoueursToClassement()">Sync joueurs</button>
+      <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
       <button onclick="assignSeats()">Assigner sièges</button>
       <div id="classement-container"></div>
     </div>
@@ -63,15 +62,6 @@
   </div>
   <script src="script.js"></script>
   
-  <!-- Modale d'élimination -->
-  <div id="elimination-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000a; z-index:1000; align-items:center; justify-content:center;">
-    <div id="elimination-modal-content" style="background:#333; color:#fff; padding:2em; border-radius:1em; min-width:300px; text-align:center;">
-      <h2 id="elimination-modal-title"></h2>
-      <div id="elimination-modal-list"></div>
-      <button onclick="closeEliminationModal()" style="margin-top:1em;">Annuler</button>
-    </div>
-  </div>
-
   <!-- Modale générique pour popup (changements d'assignation) -->
   <div id="popup-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000a; z-index:2000; align-items:center; justify-content:center;">
     <div id="popup-modal-content" style="background:#333; color:#fff; padding:2em; border-radius:1em; min-width:300px; text-align:center;">
