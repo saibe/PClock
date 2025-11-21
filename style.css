@@ -420,3 +420,22 @@ body {
 .in-btn {
   background-color: #5cb85c; /* Vert pour IN */
 }
+/* Conteneur principal pour la grille 2/3 - 1/3 */
+.tournoi-double-grid {
+  display: grid;
+  /* Définit 2 colonnes : 2 parts (2fr) et 1 part (1fr) */
+  grid-template-columns: 2fr 1fr; 
+  gap: 3em; /* Espace entre les colonnes */
+  width: 100%;
+}
+
+/* Colonne des statistiques/classement (1/3) */
+.grid-col-1-3 {
+  padding-left: 2em; 
+  border-left: 1px solid #555; /* Séparateur visuel */
+}
+
+/* S'assurer que les titres d'horloge sont grands */
+.grid-col-2-3 #level {
+    font-size: 1.5vw;
+}

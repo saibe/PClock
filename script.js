@@ -14,6 +14,7 @@ let classementSort = { column: 'rank', asc: true };
 let currentRank = 1;
 // Variable globale pour gérer le joueur en cours d'élimination
 let joueurAEliminerWinamax = null;
+let startingStack = 20000;
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -115,6 +116,37 @@ function parseCSV(text) {
   return dataLines.map(line => line.split(',').map(cell => cell.trim()));
 }
 
+function updatePlayerStatusDisplay() {
+    const totalRegistered = classementData.filter(p => p.actif === true).length;
+    const playersIn = classementData.filter(p => p.actif === true && (p.rank === null || p.rank === '')).length;
+    const playersOut = classementData.filter(p => p.rank !== null && p.rank !== '').length;
+
+    // Calcul du tapis moyen
+    let avgStack = '--';
+    if (playersIn > 0) {
+        // Le tapis total est : (Joueurs Inscrits * Stack de départ) - (Blinds et Antes totales éliminées)
+        // Simplification : Stack total initial / nombre de joueurs restants
+        const totalStack = totalRegistered * startingStack;
+        avgStack = Math.round(totalStack / playersIn).toLocaleString('fr-FR');
+    }
+
+    // Mise à jour des éléments dans la colonne 1
+    const currentPlayersSpan = document.getElementById('current-players');
+    if (currentPlayersSpan) {
+        currentPlayersSpan.textContent = playersIn;
+    }
+
+    const outPlayersSpan = document.getElementById('out-players');
+    if (outPlayersSpan) {
+        outPlayersSpan.textContent = playersOut;
+    }
+
+    const avgStackSpan = document.getElementById('avg-stack-value');
+    if (avgStackSpan) {
+        avgStackSpan.textContent = avgStack;
+    }
+}
+
 async function loadStructure() {
   try {
     const response = await fetch(CSV_URL);
@@ -167,61 +199,60 @@ async function loadStructure() {
 }
 
 function updateDisplay() {
-  if (!levels || levels.length === 0) return;
-  document.getElementById('level').textContent = levels[currentLevel].label;
-  document.getElementById('timer').textContent = formatTime(timeLeft);
-
-  // Affichage ou masquage des blinds/ante selon le type de niveau
-  const blindsInfoDiv = document.getElementById('blinds-info');
-  if (levels[currentLevel].isPause) {
-    blindsInfoDiv.style.display = '';
-    blindsInfoDiv.textContent = 'PAUSE';
-    blindsInfoDiv.classList.add('pause');
-  } else {
-    blindsInfoDiv.style.display = '';
-    blindsInfoDiv.textContent =
-      levels[currentLevel].blinds +
-      (levels[currentLevel].ante ? ' | ' + levels[currentLevel].ante : '');
-    blindsInfoDiv.classList.remove('pause');
-  }
-
-  document.getElementById('startStopBtn').textContent = running ? '⏸️ Pause' : '▶️ Démarrer';
-
-  // Affichage du prochain niveau (affiche aussi les breaks)
-  const nextLevelDiv = document.getElementById('next-level-info');
-  if (currentLevel < levels.length - 1) {
+    // 1. Déterminer les informations actuelles et suivantes
+    const current = levels[currentLevel];
     const next = levels[currentLevel + 1];
-    if (next.isPause) {
-      nextLevelDiv.textContent = "Prochain niveau : Pause (" + formatTime(next.duration) + ")";
-    } else {
-      nextLevelDiv.textContent = "Prochain niveau : " + next.blinds +
-        (next.ante ? " | " + next.ante : '');
-    }
-  } else {
-    nextLevelDiv.textContent = "";
-  }
+    
+    // 2. Formatage du temps
+    const minutes = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+    const seconds = (timeLeft % 60).toString().padStart(2, '0');
+    
+    // ===============================================
+    // 3. MISE À JOUR SÉCURISÉE DES ÉLÉMENTS DOM
+    // ===============================================
 
-  // Calcul du temps avant la prochaine pause
-  const nextBreakDiv = document.getElementById('next-break-info');
-  let timeToBreak = 0;
-  let found = false;
-  for (let i = currentLevel + 1, t = timeLeft; i < levels.length; i++) {
-    t += levels[i].duration;
-    if (levels[i].isPause) {
-      timeToBreak = t;
-      found = true;
-      break;
+    // Vérification de l'élément 'timer'
+    const timerElem = document.getElementById('timer');
+    if (timerElem) {
+        timerElem.textContent = `${minutes}:${seconds}`;
     }
-  }
-  if (found) {
-    const min = Math.floor(timeToBreak / 60);
-    const sec = timeToBreak % 60;
-    nextBreakDiv.textContent = "Prochaine pause dans : " + min + " min " + (sec < 10 ? "0" : "") + sec + " s";
-  } else {
-    nextBreakDiv.textContent = "";
-  }
 
-  exportAppToJSON();
+    // Vérification de l'élément 'level'
+    const levelElem = document.getElementById('level');
+    if (levelElem) {
+        levelElem.textContent = current.label;
+    }
+
+    // Vérification de l'élément 'blinds-info'
+    const blindsElem = document.getElementById('blinds-info');
+    if (blindsElem) {
+        blindsElem.textContent = `${current.blinds} ${current.ante}`;
+    }
+
+    // Vérification de l'élément 'next-level-info'
+    const nextLevelElem = document.getElementById('next-level-info');
+    if (nextLevelElem) {
+        if (next) {
+            nextLevelElem.textContent = next.isPause 
+                ? `Prochaine: Pause de ${next.duration / 60} min` 
+                : `Prochain niveau: ${next.blinds} ${next.ante}`;
+        } else {
+            nextLevelElem.textContent = 'Fin de la structure';
+        }
+    }
+    
+    // Vérification de l'élément 'next-break-info' (si utilisé séparément)
+    // ... (appliquez le même pattern pour tous les autres IDs manipulés par updateDisplay)
+
+    // Si le titre de la structure est mis à jour ici
+    const structureTitleElem = document.getElementById('structure-title');
+    if (structureTitleElem) {
+        structureTitleElem.textContent = structureTitle;
+    }
+
+    // Appel à la mise à jour des stats dans l'autre colonne
+    updatePlayerStatusDisplay(); 
+    renderClassementSimplifie();
 }
 
 function formatTime(seconds) {
@@ -234,7 +265,7 @@ function nextLevel() {
   if (currentLevel < levels.length - 1) {
     currentLevel++;
     timeLeft = levels[currentLevel].duration;
-    stopTimer();
+//    stopTimer();
     updateDisplay();
   }
 }
@@ -445,6 +476,33 @@ function sortClassement(column) {
     classementSort.asc = true;
   }
   renderClassement();
+}
+
+function renderClassementSimplifie() {
+    // 1. Filtrer uniquement les joueurs éliminés et classés
+    const rankedPlayers = classementData.filter(p => p.rank !== null && p.rank !== '');
+    
+    // 2. Trier par rang final (du plus petit au plus grand, ex: 1er, 2e, 3e...)
+    rankedPlayers.sort((a, b) => parseInt(a.rank) - parseInt(b.rank));
+    
+    let htmlContent = '';
+    
+    if (rankedPlayers.length === 0) {
+        htmlContent = 'Aucune élimination enregistrée.';
+    } else {
+        // Affichage des joueurs (Rank. Nom)
+        htmlContent = rankedPlayers.map(p => `
+            <div>
+                <span style="color:#ffb300; font-weight:bold;">${p.rank}.</span> 
+                ${p.prenom} ${p.nom.charAt(0)}.
+            </div>
+        `).join('');
+    }
+
+    const container = document.getElementById('simple-ranking-container');
+    if (container) {
+        container.innerHTML = htmlContent;
+    }
 }
 
 function renderClassement() {
