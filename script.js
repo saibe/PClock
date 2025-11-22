@@ -6,7 +6,8 @@ let currentLevel = 0;
 let timeLeft = 0;
 let timerInterval = null;
 let running = false;
-let structureTitle = "Poker Clock";
+let dateOfTheDay= new Date();
+let structureTitle = 'ASL POKER 72 - S14T1 - ' + dateOfTheDay.getDate() + '/' + (dateOfTheDay.getMonth()+1);
 let selectedPlayersIndexes = [];
 let playerAssignments = []; // [{index, table, seat}]
 let classementData = [];
@@ -27,26 +28,13 @@ const fontRatios = {
 };
 
 function applyFontSizes() {
+  return;
   document.getElementById('level').style.fontSize = (baseFontSize * fontRatios.level) + 'em';
   document.getElementById('timer').style.fontSize = (baseFontSize * fontRatios.timer) + 'em';
   document.getElementById('blinds-info').style.fontSize = (baseFontSize * fontRatios.blinds) + 'em';
   document.getElementById('next-level-info').style.fontSize = (baseFontSize * fontRatios.nextLevel) + 'em';
   document.getElementById('next-break-info').style.fontSize = (baseFontSize * fontRatios.nextBreak) + 'em';
 }
-applyFontSizes();
-
-document.addEventListener('keydown', function(e) {
-  if (e.code === 'PageUp') {
-    baseFontSize += 1;
-    applyFontSizes();
-    e.preventDefault();
-  }
-  if (e.code === 'PageDown') {
-    baseFontSize = Math.max(1, baseFontSize - 1);
-    applyFontSizes();
-    e.preventDefault();
-  }
-});
 
 function syncJoueursToClassement() {
   if (!window.joueursImportes || window.joueursImportes.length === 0) {
@@ -109,8 +97,10 @@ updateDateTime();
 
 function parseCSV(text) {
   const lines = text.trim().split('\n');
+/*
   // On prend la première ligne comme titre
   structureTitle = lines[0].replace(/,/g, ' ').trim();
+*/
   // On saute les 6 premières lignes (0 à 5) pour les données
   const dataLines = lines.slice(6);
   return dataLines.map(line => line.split(',').map(cell => cell.trim()));
@@ -188,13 +178,18 @@ async function loadStructure() {
 
     if (levels.length === 0) throw new Error('Aucun niveau trouvé dans la structure.');
 
-//    currentLevel = 0;
-//    timeLeft = levels[0].duration;
-    document.getElementById('loading').style.display = 'none';
+    // Sécurisation de l'accès aux variables globales (réinitialisation si la structure est plus courte)
+    if (currentLevel >= levels.length) {
+        currentLevel = 0;
+    }
+    if (currentLevel === 0 && timeLeft <= 0) {
+        timeLeft = levels[0].duration;
+    }
+    
     updateDisplay();
     renderStructureTable();
   } catch (e) {
-    document.getElementById('loading').textContent = 'Erreur de chargement : ' + e.message;
+    alert.error("Erreur de chargement de la structure:", e);
   }
 }
 
@@ -223,10 +218,12 @@ function updateDisplay() {
         levelElem.textContent = current.label;
     }
 
-    // Vérification de l'élément 'blinds-info'
-    const blindsElem = document.getElementById('blinds-info');
-    if (blindsElem) {
-        blindsElem.textContent = `${current.blinds} ${current.ante}`;
+    // Affichage ou masquage des blinds/ante selon le type de niveau
+    const blindsInfoDiv = document.getElementById('blinds-info');
+    if (blindsInfoDiv) {
+      blindsInfoDiv.textContent =
+        levels[currentLevel].blinds +
+        (levels[currentLevel].ante ? ' | ' + levels[currentLevel].ante : '');      
     }
 
     // Vérification de l'élément 'next-level-info'
@@ -240,9 +237,38 @@ function updateDisplay() {
             nextLevelElem.textContent = 'Fin de la structure';
         }
     }
-    
-    // Vérification de l'élément 'next-break-info' (si utilisé séparément)
-    // ... (appliquez le même pattern pour tous les autres IDs manipulés par updateDisplay)
+
+    // Calcul du temps avant la prochaine pause
+    const nextBreakDiv = document.getElementById('next-break-info');
+    let timeToBreak = 0;
+    let found = false;
+    let breakDuration = 0;
+    for (let i = currentLevel + 1, t = timeLeft; i < levels.length; i++) {
+      t += levels[i].duration;
+      if (levels[i].isPause) {
+        breakDuration = levels[i].duration;
+        timeToBreak = t;
+        found = true;
+        break;
+      }
+    }
+    if (found) {
+      const min = Math.floor((timeToBreak-breakDuration) / 60);
+      const sec = timeToBreak % 60;
+      nextBreakDiv.textContent = "Break dans : " + min + " min " + (sec < 10 ? "0" : "") + sec + " s";
+    } else {
+      nextBreakDiv.textContent = "";
+    }
+
+    if (levels[currentLevel].isPause) {
+      timerElem.classList.add('pause');
+      levelElem.textContent='-';
+      blindsInfoDiv.textContent = 'PAUSE';
+      blindsInfoDiv.classList.add('pause');
+    } else {
+      timerElem.classList.remove('pause');
+      blindsInfoDiv.classList.remove('pause');
+    }
 
     // Si le titre de la structure est mis à jour ici
     const structureTitleElem = document.getElementById('structure-title');
@@ -303,12 +329,35 @@ function startTimer() {
     }, 1000);
     updateDisplay();
   }
+
+    // Gestion de l'affichage des boutons (Démarrer -> Pause)
+  const startBtn = document.getElementById('start-btn');
+  const stopBtn = document.getElementById('stop-btn');
+  if (startBtn) startBtn.style.display = 'none';
+  if (stopBtn) stopBtn.style.display = 'inline-block';
+
+
 }
 
 function stopTimer() {
-  running = false;
-  clearInterval(timerInterval);
-  updateDisplay();
+    if (!running) return;
+
+    running = false;
+    clearInterval(timerInterval);
+    timerInterval = null;
+    updateDisplay();
+
+    // Gestion des boutons
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+
+    if (startBtn) {
+        startBtn.style.display = 'inline-block'; // Afficher Démarrer
+    }
+    if (stopBtn) {
+        stopBtn.style.display = 'none'; // Masquer Pause
+    }
+    // Fin du nouveau code
 }
 
 function playLongBeep(duration = 2) {
@@ -373,6 +422,7 @@ function playMultiToneAlert() {
 
 function resetAll() {
   // 1. Remet le chrono au round 1
+  stopTimer();
   currentLevel = 0;
   timeLeft = levels[0]?.duration || 0;
   running = false;
@@ -393,15 +443,18 @@ function resetAll() {
   renderClassement();
   renderTablesPlan();
   exportAppToJSON();
-}
+}// Génère le tableau de structure complète
 
 function showTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(tabDiv => tabDiv.classList.remove('active'));
   document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'structure') {
+    loadStructure();
+  }
   if (tab === 'joueurs') {
-    //importPlayersCSV();
+    importPlayersCSV();
   }
   if (tab === 'tables') {
     renderTablesPlan();
@@ -413,60 +466,35 @@ function showTab(tab) {
 
 // Génère le tableau de structure complète
 function renderStructureTable() {
-  if (!levels || levels.length === 0) return;
+  // Vérification de l'existence du conteneur
+  const container = document.getElementById('structure-table-container');
+  if (!container) {
+      // Si on ne trouve pas l'ID, on arrête sans erreur.
+      console.error("Erreur: Le conteneur de structure (ID 'structure-table-container') est manquant.");
+      return;
+  }
+  
+  if (!levels || levels.length === 0) {
+      container.innerHTML = '<p style="color:red;">Aucune structure de niveaux chargée.</p>';
+      return;
+  }
+
   let html = '<table id="structure-table"><thead><tr><th>#</th><th>Type</th><th>Blinds</th><th>Ante</th><th>Durée</th></tr></thead><tbody>';
   levels.forEach((lvl, idx) => {
+    // La fonction formatTime est déjà définie pour formatter la durée
+    const durationDisplay = formatTime(lvl.duration); 
+    
     if (lvl.isPause) {
-      html += `<tr class="pause-row"><td>${idx + 1}</td><td>Pause</td><td colspan="2"></td><td>${formatTime(lvl.duration)}</td></tr>`;
+      html += `<tr class="pause-row"><td>${idx + 1}</td><td>Pause</td><td colspan="2"></td><td>${durationDisplay}</td></tr>`;
     } else {
-      html += `<tr><td>${idx + 1}</td><td>${lvl.label}</td><td>${lvl.blinds}</td><td>${lvl.ante || '-'}</td><td>${formatTime(lvl.duration)}</td></tr>`;
+      html += `<tr><td>${idx + 1}</td><td>${lvl.label}</td><td>${lvl.blinds}</td><td>${lvl.ante || '-'}</td><td>${durationDisplay}</td></tr>`;
     }
   });
   html += '</tbody></table>';
-  document.getElementById('structure-table-container').innerHTML = html;
+  
+  // Injection dans le conteneur sécurisé
+  container.innerHTML = html;
 }
-
-restoreAppFromLocalStorage();
-loadStructure();
-
-// Edition du titre
-document.getElementById('edit-title-btn').addEventListener('click', function() {
-  const titleElem = document.getElementById('structure-title');
-  const currentTitle = titleElem.textContent;
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = currentTitle;
-  input.style.fontSize = '1.2em';
-  input.style.textAlign = 'center';
-  input.style.width = '70%';
-
-  // Remplace le titre par l'input
-  titleElem.replaceWith(input);
-  input.focus();
-
-  // Fonction pour valider la modification
-  function saveTitle() {
-    const newTitle = input.value.trim() || 'Structure Tournoi';
-    const newTitleElem = document.createElement('h1');
-    newTitleElem.id = 'structure-title';
-    newTitleElem.style.display = 'inline';
-    newTitleElem.textContent = newTitle;
-    input.replaceWith(newTitleElem);
-    // Remettre l'écouteur sur le nouveau h1
-    document.getElementById('edit-title-btn').disabled = false;
-  }
-
-  // Valide au blur ou sur Entrée
-  input.addEventListener('blur', saveTitle);
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      input.blur();
-    }
-  });
-
-  // Désactive le bouton pendant l'édition
-  document.getElementById('edit-title-btn').disabled = true;
-});
 
 function sortClassement(column) {
   if (classementSort.column === column) {
@@ -479,30 +507,62 @@ function sortClassement(column) {
 }
 
 function renderClassementSimplifie() {
-    // 1. Filtrer uniquement les joueurs éliminés et classés
-    const rankedPlayers = classementData.filter(p => p.rank !== null && p.rank !== '');
-    
+// 1. Filtrer uniquement les joueurs éliminés ET inscrits
+    const rankedPlayers = classementData.filter(p => 
+        // Le joueur doit être inscrit (isIn est true)
+        (p.actif === true) 
+    );
+
     // 2. Trier par rang final (du plus petit au plus grand, ex: 1er, 2e, 3e...)
     rankedPlayers.sort((a, b) => parseInt(a.rank) - parseInt(b.rank));
     
     let htmlContent = '';
     
-    if (rankedPlayers.length === 0) {
-        htmlContent = 'Aucune élimination enregistrée.';
-    } else {
-        // Affichage des joueurs (Rank. Nom)
-        htmlContent = rankedPlayers.map(p => `
-            <div>
-                <span style="color:#ffb300; font-weight:bold;">${p.rank}.</span> 
-                ${p.prenom} ${p.nom.charAt(0)}.
-            </div>
-        `).join('');
-    }
-
     const container = document.getElementById('simple-ranking-container');
-    if (container) {
-        container.innerHTML = htmlContent;
+    if (!container) return; // Sécurité
+    
+    if (rankedPlayers.length === 0) {
+        container.innerHTML = 'Aucune élimination enregistrée.';
+        return;
     }
+    
+    // Démarrer la structure du tableau
+    htmlContent = '<table class="simple-ranking-table"><tbody>';
+
+    // 3. Générer les lignes du tableau (Rang | Nom | Bouton OUT)
+    rankedPlayers.forEach(p => {
+        // Supposons que p.isOut existe pour vérifier si le joueur est déjà éliminé (ce qui devrait être le cas ici)
+        const buttonText = p.isOut ? '-' : 'OUT'; 
+        
+        // Nous allons ajouter un bouton pour POUVOIR annuler l'élimination ou modifier le statut.
+        // Si le joueur est classé (rankedPlayers), le bouton est inutile, car il est déjà OUT.
+        // C'est pourquoi ce tableau affiche uniquement les joueurs DÉJÀ éliminés.
+        
+        // Pour les besoins du développement, nous allons l'ajouter pour potentiellement modifier le rang.
+
+        htmlContent += `
+            <tr>
+                <td class="rank-cell">
+                    ${p.rank}.
+                </td>
+                <td class="name-cell">
+                    ${p.winamax}
+                </td>
+                
+                <td class="btn-cell">
+                    <button 
+                        class="ranking-out-btn out-btn"
+                        title="Eliminer ${p.winamax}"
+                        onclick="toggleOutClassement('${p.winamax}')"> ${buttonText}
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    htmlContent += '</tbody></table>';
+    container.innerHTML = htmlContent;
+    exportAppToJSON();
 }
 
 function renderClassement() {
@@ -540,7 +600,6 @@ function renderClassement() {
           if (a.mpla > b.mpla) return 1;
           return 0;
       }
-
 
       // ----------------------------------------------------
       // Si les deux sont ACTIFS (Inscrit)
@@ -785,8 +844,6 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   const totalPlayers = joueurs.length;
   const nbTables = Math.max(1, Math.ceil(totalPlayers / perTable));
 
-  console.log("nbTables: " + nbTables);
-
   // Regrouper les anciens assignments par table
   let oldByTable = {};
   oldAssignments.forEach(a => {
@@ -808,9 +865,6 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
       delete oldByTable[tc];
     });
   }
-  console.log("oldTables:" + oldTables);
-  console.log("tablesCassees:" + tablesCassees);
-  console.log("joueursToReassign:" + joueursToReassign);
 
   // 2. Génère la liste des tables restantes
   let tableNumbers;
@@ -823,8 +877,6 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
       tableNumbers.push(next);
     }
   }
-
-  console.log("tableNumbers:" + tableNumbers);
 
   // 3. Place les joueurs à leur table/siège d'origine si possible (hors tables cassées)
   let assignments = [];
@@ -859,7 +911,6 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
       table: destTable,
       seat: s
     });
-    console.log("assignments:" + assignments);
     usedWinamax.add(j.winamax);
     usedSeats.add(s);
   });
@@ -901,8 +952,6 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     // On boucle jusqu'à équilibre
   }
 
-  console.log("assignments(apres section 5):" + assignments);
-
   // 6. Pour les joueurs non encore assignés, on leur attribue le premier siège libre sur une table ouverte
   let unassignedJoueurs = joueurs.filter(j => !assignments.find(a => a.winamax === j.winamax));
 
@@ -925,8 +974,6 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     usedSeatsByTable[destTable].add(s);
   });
 
-  console.log("assignments(apres section 6):" + assignments);
-  
   // 7. Changements d'assignation (pour la popup)
   let changes = [];
   assignments.forEach(a => {
@@ -967,7 +1014,6 @@ function assignSeats() {
 
   // Nombre de joueurs max par table
   const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
-  console.log("perTable: " + perTable);
 
   // Construit oldAssignments à partir de classementData pour les joueurs payés
   const oldAssignments = joueurs.map(j => {
@@ -1098,35 +1144,18 @@ function renderTablesPlan() {
   document.getElementById('tables-plan').innerHTML = html;
 }
 
-// Fonction pour restaurer la sélection et l'assignation depuis le JSON
-function restorePlayersFromJSON(joueurs) {
-  // On reconstruit selectedPlayersIndexes et playerAssignments
-  selectedPlayersIndexes = [];
-  playerAssignments = [];
-  joueurs.forEach((p, idx) => {
-    if (p.checked) selectedPlayersIndexes.push(idx);
-    if (p.table && p.seat) {
-      playerAssignments.push({
-        index: idx,
-        table: parseInt(p.table),
-        seat: parseInt(p.seat)
-      });
-    }
-  });
-  // Recharge le tableau des joueurs et le plan des tables
-  importPlayersCSV();
-  if (typeof renderTablesPlan === 'function') renderTablesPlan();
-  renderClassement();
-}
-
 function restoreAppFromLocalStorage() {
-  const appStateJSON = localStorage.getItem('poker_app_export');
+  const appStateJSON = localStorage.getItem('pokerAppData');
   if (!appStateJSON) return;
   try {
     const appState = JSON.parse(appStateJSON);
+    console.log("restoring ... pokerAppData file");
+    console.log(appState);
 
     // Structure
-    if (appState.structure) levels = appState.structure;
+    if (appState.levels) levels = appState.levels;
+    console.log("restoring levels ...");
+    console.log(levels);
 
     // Horloge
     if (appState.horloge) {
@@ -1137,20 +1166,36 @@ function restoreAppFromLocalStorage() {
       running = !!appState.horloge.running;
       applyFontSizes();
     }
+    console.log("restoring horloge ...");
+    console.log(currentLevel);
+    console.log(timeLeft);
+    console.log(baseFontSize);
+    console.log(running);
 
     // Joueurs
     selectedPlayersIndexes = appState.selectedPlayersIndexes || [];
     playerAssignments = appState.playerAssignments || [];
+    
+    console.log("restoring playerAssignments ...");
+    console.log(playerAssignments);
+
+    // ClassementData
+    console.log("restoring classementData ...");
+    console.log(appState.classementData);
+    if (appState.classementData) classementData = appState.classementData;
+    console.log(classementData);
 
     // Titre
     if (appState.structureTitle) {
       const titleElem = document.getElementById('structure-title');
       if (titleElem) titleElem.textContent = appState.structureTitle;
+      structureTitle = appState.structureTitle;
     }
+    console.log("restoring structureTitle ...");
+    console.log(structureTitle);
 
     // Recharge l’affichage
     updateDisplay();
-    importPlayersCSV();
     if (typeof renderTablesPlan === 'function') renderTablesPlan();
     renderClassement();
 
@@ -1178,7 +1223,6 @@ function exportAppToJSON() {
         currentRank: currentRank, 
         joueurAEliminerWinamax: joueurAEliminerWinamax,
         selectedPlayersIndexes: selectedPlayersIndexes,
-        // ... ajoutez d'autres variables globales importantes si nécessaire
     };
     const jsonString = JSON.stringify(appData);
     
@@ -1188,71 +1232,8 @@ function exportAppToJSON() {
     // Note: Si vous souhaitez TOUJOURS conserver l'export fichier pour un backup manuel,
     // ajoutez ici le code de téléchargement de fichier que vous aviez. Sinon, il n'est plus nécessaire.
     console.log("Données sauvegardées automatiquement dans localStorage.");
-}
-
-function restoreAppFromLocalStorage() {
-    const jsonString = localStorage.getItem('pokerAppData');
-
-    if (jsonString) {
-        console.log("Restauration des données depuis localStorage...");
-        // importAppFromJSON prend la chaîne JSON et met à jour l'état de l'application
-        importAppFromJSON(jsonString); 
-    } else {
-        console.log("Aucune donnée trouvée dans localStorage. Initialisation standard.");
-        // Si aucune sauvegarde n'existe, on charge les joueurs depuis le CSV
-        importPlayersCSV(); 
-        // Et on affiche le classement initial
-        renderClassement();
-        renderTablesPlan();
-        updateDateTime(); // Initialise l'horloge
-    }
-}
-
-function importAppFromJSON(json) {
-  try {
-    // NOUVELLE LIGNE : Affiche le type et la longueur pour un diagnostic clair
-    console.log("load JSON: Type =", typeof json, "| Longueur =", json ? json.length : 0);
-    
-    // Si 'json' est undefined ou vide, nous arrêtons l'exécution ici
-    if (!json) {
-      alert("Le fichier est vide ou n'a pas pu être lu.");
-      return;
-    }
-
-    const appState = typeof json === 'string' ? JSON.parse(json) : json;
-    if (appState.structure) levels = appState.structure;
-    if (appState.horloge) {
-      stopTimer();
-      currentLevel = appState.horloge.currentLevel ?? 0;
-      timeLeft = appState.horloge.timeLeft ?? 0;
-      baseFontSize = appState.horloge.baseFontSize ?? 2;
-      running = !!appState.horloge.running;
-      applyFontSizes();
-    }
-    playerAssignments = (appState.playerAssignments || []).map(a => ({ ...a }));
-    if (appState.structureTitle) {
-      const titleElem = document.getElementById('structure-title');
-      if (titleElem) titleElem.textContent = appState.structureTitle;
-    }
-    console.log("appState.classement:" + appState.classementData);
-    console.log("classementData:" + classementData);
-    if (appState.classementData) {
-      classementData = appState.classementData.map(p => ({ ...p }));
-    }
-    console.log("appState.classement:" + appState.classementData);
-    console.log("classementData:" + classementData);
-
-    importPlayersCSV();
-    setTimeout(() => {
-//      syncSelectedPlayersIndexes();
-      renderClassement();
-      renderTablesPlan();
-      updateDisplay();
-      if (running) startTimer();
-    }, 0);
-  } catch (e) {
-    alert("Erreur lors de l'import du fichier JSON.");
-  }
+    console.log(appData);
+    console.log(jsonString);
 }
 
 function updateClassementCell(winamax, field, value) {
@@ -1270,27 +1251,62 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================
   // Tente de charger l'état depuis localStorage
   restoreAppFromLocalStorage();
-  // Si le classement est vide après le chargement, c'est la première exécution.
-  if (classementData.length === 0) {
-    console.log("Classement VIDE: importPlayersCSV");
-    // Appelle la fonction qui charge les joueurs par défaut (via CSV)
-    importPlayersCSV(); 
-  }
     
-  // Afficher l'état chargé ou initialisé
-/*
-  console.log("==========3============");
-  console.log(localStorage.getItem('pokerAppData'));
-  console.log("=======================");
-*/
+  console.log(classementData);
+  
+  updateDisplay();
   renderClassement(); 
-/*
-  console.log("==========4============");
-  console.log(localStorage.getItem('pokerAppData'));
-  console.log("=======================");
-*/
   renderTablesPlan();
-  console.log("==========5============");
-  console.log(localStorage.getItem('pokerAppData'));
-  console.log("=======================");
+});
+
+// Edition du titre
+document.getElementById('edit-title-btn').addEventListener('click', function() {
+  const titleElem = document.getElementById('structure-title');
+  const currentTitle = titleElem.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentTitle;
+  input.style.fontSize = '1.2em';
+  input.style.textAlign = 'center';
+  input.style.width = '70%';
+
+  // Remplace le titre par l'input
+  titleElem.replaceWith(input);
+  input.focus();
+
+  // Fonction pour valider la modification
+  function saveTitle() {
+    const newTitle = input.value.trim() || 'Structure Tournoi';
+    const newTitleElem = document.createElement('h1');
+    newTitleElem.id = 'structure-title';
+    newTitleElem.style.display = 'inline';
+    newTitleElem.textContent = newTitle;
+    input.replaceWith(newTitleElem);
+    // Remettre l'écouteur sur le nouveau h1
+    document.getElementById('edit-title-btn').disabled = false;
+  }
+
+  // Valide au blur ou sur Entrée
+  input.addEventListener('blur', saveTitle);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      input.blur();
+    }
+  });
+
+  // Désactive le bouton pendant l'édition
+  document.getElementById('edit-title-btn').disabled = true;
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'PageUp') {
+    baseFontSize += 1;
+    applyFontSizes();
+    e.preventDefault();
+  }
+  if (e.code === 'PageDown') {
+    baseFontSize = Math.max(1, baseFontSize - 1);
+    applyFontSizes();
+    e.preventDefault();
+  }
 });

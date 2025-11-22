@@ -9,16 +9,40 @@ body {
   height: 100%;
   margin: 0;
 }
-.datetime {
+.container {
+  background: #333;
+  padding: 2em 3em;
+  border-radius: 16px;
+  box-shadow: 0 0 24px #000a;
   text-align: center;
-  font-size: 1.2em;
+  min-width: 350px;
+  width:100%;
+  height: 100%;
+  margin-top: 0;
+}
+.title {
+  background-color: chocolate;
+  text-align: center;
+  padding: 0.5em 0;
+  font-size: xx-large;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+  border-bottom-left-radius: 0px;
+}
+.tab-buttons-group {
+    display: flex;
+    gap: 0.5em; /* Espace entre chaque bouton */
+}
+.datetime {
+  font-size: 2em;
   color: #ffb300;
-  margin-bottom: 0.5em;
-  letter-spacing: 0.05em;
+  margin-bottom: 0;
 }
 .tabs {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: 3em;
   gap: 0.5em;
   position: relative;
@@ -39,24 +63,6 @@ body {
 .tab-btn.active, .tab-btn:hover {
   background: chocolate;
   color: #222;
-}
-.container {
-  background: #333;
-  padding: 2em 3em;
-  border-radius: 16px;
-  box-shadow: 0 0 24px #000a;
-  text-align: center;
-  min-width: 350px;
-  width:100%;
-  height: 100%;
-  margin-top: 0;
-}
-.title {
-  background-color: chocolate;
-  text-align: center;
-  padding: 0.5em 0;
-  font-size: xx-large;
-  border-radius: 12px;
 }
 #structure-title {
   margin: 0;
@@ -86,11 +92,27 @@ body {
   font-size: 5em;
   letter-spacing: 0.1em;
 }
+#timer.pause {
+  background: darkred;
+  color: #fff;
+  font-size: 5em;
+  letter-spacing: 0.1em;
+}
 #level {
   font-size: 2em;
 }
 #blinds-info {
-  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: center;
+    /* Utilisation de clamp() pour un design optimal */
+    /* Taille de police : 
+       Minimum: 1em (pour la lisibilité)
+       Idéal: 5vw (5% de la largeur du viewport)
+       Maximum: 5em (pour éviter que ça ne devienne trop énorme sur grands écrans)
+    */
+    font-size: clamp(10px, 25vw, 200px);
+    font-weight: bold;
 }
 #blinds-info.pause {
   background: darkred;
@@ -99,12 +121,12 @@ body {
 }
 #next-level-info {
   margin: 0.5em 0 0.2em 0;
-  font-size: 1.2em;
+  font-size: 2em;
   color: #bbb;
 }
 #next-break-info {
-  margin: 0.2em 0 1em 0;
-  font-size: 1.1em;
+  /*margin: 0.2em 0 1em 0;*/
+  font-size: 2em;
   color: #bbb;
 }
 .controls button {
@@ -433,9 +455,84 @@ body {
 .grid-col-1-3 {
   padding-left: 2em; 
   border-left: 1px solid #555; /* Séparateur visuel */
+  font-size: 2em;
 }
-
+/* S'assurer que les titres d'horloge sont grands */
+#avg-stack-value, #current-players{
+    font-size: 2em;
+}
 /* S'assurer que les titres d'horloge sont grands */
 .grid-col-2-3 #level {
     font-size: 1.5vw;
+}
+/* Styles pour le conteneur du minuteur (2/3) */
+.grid-col-2-3 {
+    /* Ajoutons un peu de flexibilité au texte à l'intérieur */
+    display: flex;
+    flex-direction: column;
+    justify-content: top;
+    align-items: center;
+}
+.grid-col-2-3, .grid-col-1-3 {
+    /* Permettre aux éléments longs (comme les blinds) d'être coupés
+       au lieu de forcer la colonne à s'étendre. */
+    min-width: 0; 
+}
+/* style.css - Styles pour le classement simplifié dans la colonne 1/3 */
+
+.simple-ranking-table {
+    width: 100%;
+    /* Supprime les bordures par défaut */
+    border-collapse: collapse;
+}
+
+/* Cellule du rang (colonne 1) */
+.simple-ranking-table .rank-cell {
+    /* Alignement du rang à droite */
+    text-align: right;
+    width: 15%; /* Pour donner assez d'espace au rang */
+    padding-right: 0.5em; 
+    
+    /* Style visuel du rang */
+    color: #ffb300; 
+    font-weight: bold;
+}
+
+/* Cellule du nom du joueur (colonne 2) */
+.simple-ranking-table .name-cell {
+    /* Alignement du nom à gauche */
+    text-align: left;
+    padding-left: 0.5em;
+    /* Pour s'assurer que le nom est coupé s'il est trop long */
+    overflow: hidden;
+    white-space: nowrap; 
+    text-overflow: ellipsis; /* Ajoute des "..." si le nom est coupé */
+}
+
+/* Retirer le padding vertical pour que la liste soit compacte */
+.simple-ranking-table td {
+    padding: 0.1em 0;
+}
+simple-ranking-table .btn-cell {
+    width: 20%; /* Pour donner de la place au bouton */
+    text-align: right;
+    padding-left: 0.5em;
+}
+
+/* Style du bouton "OUT" dans le classement */
+.ranking-out-btn {
+    /* Style général des boutons OUT (utiliser la classe .out-btn existante) */
+    background-color: #d9534f; /* Rouge */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.3em 0.5em;
+    cursor: pointer;
+    font-size: 0.9em;
+    line-height: 1; /* Pour être compact */
+}
+
+/* Assurer un peu plus d'espace sur les lignes du tableau */
+.simple-ranking-table td {
+    padding: 0.3em 0; /* Augmenter le padding vertical */
 }
