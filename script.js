@@ -859,6 +859,14 @@ function toggleOutClassement(mpla) {
 
         // 3. Attribution des points au joueur 
         classementData[index].pts = DEFAULT_POINTS_BAREME.find(item => item.rank === classementData[index].rank).points;
+        // 3. Attribution des points au joueur 
+        joueurRestantPts = DEFAULT_POINTS_BAREME.find(item => item.rank === (classementData[index].rank - 1)).points;
+        console.log("Points joueurs suivants: "+joueurRestantPts);
+        classementData.forEach(p => {
+          if (p.actif && (p.rank === null || p.rank === '')) {
+            p.pts = joueurRestantPts;
+          }
+        });
 
         // 4. Retirer l'assignation de table/siège
         classementData[index].table = null;
@@ -919,7 +927,8 @@ function toggleOutClassement(mpla) {
     // 6. Mettre à jour l'affichage
     renderClassementSimplifie();
     renderClassement();
-    renderTablesPlan(); 
+    renderTablesPlan();
+    updateDisplay();
     exportAppToJSON();
 }
 
@@ -1528,14 +1537,19 @@ function renderChampionnatRanking() {
     // Ceci est crucial pour que la mise en évidence du top 33% s'applique correctement
     championshipData.sort((a, b) => {
         // Convertir la chaîne de caractères 'rank' en nombre pour un tri numérique
-        const rankA = parseInt(a.rank, 10);
-        const rankB = parseInt(b.rank, 10);
+        const pointA = parseInt(a.points, 10);
+        const pointB = parseInt(b.points, 10);
         
         // Gérer les cas où le rang n'est pas un nombre (pour les mettre à la fin, par exemple)
-        if (isNaN(rankA)) return 1;
-        if (isNaN(rankB)) return -1;
+        if (isNaN(pointA)) return 1;
+        if (isNaN(pointB)) return -1;
 
-        return rankA - rankB;
+        addPtsA = classementData.find(item => item.mpla === a.mpla).pts;
+        addPtsA = addPtsA ? addPtsA : 0;
+        addPtsB = classementData.find(item => item.mpla === b.mpla).pts;
+        addPtsB = addPtsB ? addPtsB : 0;
+
+        return (pointB+addPtsB) - (pointA+addPtsA);
     });
 
     
@@ -1575,16 +1589,20 @@ function renderChampionnatRanking() {
         // Ajout de la classe si le joueur fait partie du top 33%
         const rowClass = (rank > 0 && rank <= top33Count) ? 'top-33-percent' : '';
         
-        html += `<tr class="${rowClass}">`;
+        addPts = classementData.find(item => item.mpla === p.mpla).pts;
+        console.log(addPts);
+        isRank = classementData.find(item => item.mpla === p.mpla).rank;
+        if (addPts>0){
+          style = (isRank > 0) ? "color:purple;background-color:lightyellow ! important" : "background-color:yellow ! important";
+        } else {
+          style = '';
+        }
+
+        html += `<tr style="${style}" class="${rowClass}">`;
         columnsToDisplay.forEach(col => {
-          if(col.key === "points") {
-            const foundItem = classementData.find(item => item.mpla.trim().toLowerCase() === p.mpla.trim().toLowerCase());
-            console.log("foundItem:");
-            console.log(foundItem);
-            addPts = classementData.find(item => item.mpla === p.mpla).pts;
-            console.log(addPts);
-            field=addPts ? p[col.key]+'(+'+addPts+')' : p[col.key];
-            html += `<td>${field || ''}</td>`; 
+          if(col.key === "pts") {
+            field=addPts ? '+'+addPts : '';
+            html += `<td>${field}</td>`; 
           } else {
             html += `<td>${p[col.key] || ''}</td>`; 
           }
