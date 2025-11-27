@@ -1,5 +1,6 @@
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
 const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFOKpdZMMO9sPcpWH6mrQW2S-eaxu-8B6YTZ4ZM93WgbAXuDG8-9nkrO3D644WmxAqHGdm07FGkh7H/pub?gid=137620678&single=true&output=csv';
+const POINTS_STORAGE_KEY = 'championshipPointsBareme';
 
 let levels = [];
 let currentLevel = 0;
@@ -14,8 +15,10 @@ let classementData = [];
 let classementSort = { column: 'rank', asc: true };
 let currentRank = 1;
 // Variable globale pour gérer le joueur en cours d'élimination
-let joueurAEliminerWinamax = null;
+let joueurAEliminerMPLA = null;
 let startingStack = 20000;
+let championshipData = null;
+let POINTS_BAREME_DATA = getPointsBareme();
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -26,6 +29,45 @@ const fontRatios = {
   nextLevel: 0.3,
   nextBreak: 0.3
 };
+// --- Barème de points par défaut (jusqu'au rang 50) ---
+const DEFAULT_POINTS_BAREME = [
+    { rank:  1, points: 500 }, { rank:  2, points: 450 }, { rank:  3, points: 400 },
+    { rank:  4, points: 350 }, { rank:  5, points: 300 }, { rank:  6, points: 250 },
+    { rank:  7, points: 200 }, { rank:  8, points: 150 }, { rank:  9, points: 130 },
+    { rank: 10, points: 110 }, { rank: 11, points: 100 }, { rank: 12, points:  90 },
+    { rank: 13, points:  80 }, { rank: 14, points:  70 }, { rank: 15, points:  60 },
+    { rank: 16, points:  50 }, { rank: 17, points:  45 }, { rank: 18, points:  40 },
+    { rank: 19, points:  35 }, { rank: 20, points:  30 }, { rank: 21, points:  25 },
+    { rank: 22, points:  20 }, { rank: 23, points:  15 }, { rank: 24, points:  10 }
+];
+// Rangs 25 à 50 à 5 points
+for (let i = 25; i <= 50; i++) {
+    DEFAULT_POINTS_BAREME.push({ rank: i, points: 5 });
+}
+
+/**
+ * Charge le barème depuis localStorage ou utilise la version par défaut.
+ * @returns {Array<Object>} Le barème de points actuel.
+ */
+function getPointsBareme() {
+    const savedData = localStorage.getItem(POINTS_STORAGE_KEY);
+    if (savedData) {
+        // Parse les données et assure la conversion des points en nombres
+        const parsedData = JSON.parse(savedData);
+        return parsedData.map(item => ({ 
+            rank: parseInt(item.rank, 10), 
+            points: parseInt(item.points, 10) 
+        }));
+    }
+    return DEFAULT_POINTS_BAREME;
+}
+
+/**
+ * Sauvegarde le barème actuel dans localStorage.
+ */
+function savePointsBareme(bareme) {
+    localStorage.setItem(POINTS_STORAGE_KEY, JSON.stringify(bareme));
+}
 
 function applyFontSizes() {
   return;
@@ -46,7 +88,7 @@ function syncJoueursToClassement() {
     nom: j.nom,
     prenom: j.prenom,
     mpla: j.mpla,
-    round: '', heure: '', killer: '', out: false, rank: '', table: '', seat: '', actif: false
+    round: '', heure: '', killer: '', out: false, rank: '', table: '', seat: '', actif: false, pts: 0,
   }));
 
   // Réinitialise la liste des anciennes assignations
@@ -167,7 +209,7 @@ async function loadStructure() {
       // Ajoute le break si présent
       if (breakDuration && parseInt(breakDuration) > 0) {
         levels.push({
-          label: `Pause`,
+          label: `BREAK`,
           blinds: '-',
           ante: '',
           duration: parseInt(breakDuration) * 60,
@@ -231,7 +273,7 @@ function updateDisplay() {
     if (nextLevelElem) {
         if (next) {
             nextLevelElem.textContent = next.isPause 
-                ? `Prochaine: Pause de ${next.duration / 60} min` 
+                ? `Prochain niveau: break de ${next.duration / 60} min` 
                 : `Prochain niveau: ${next.blinds} ${next.ante}`;
         } else {
             nextLevelElem.textContent = 'Fin de la structure';
@@ -263,7 +305,7 @@ function updateDisplay() {
     if (levels[currentLevel].isPause) {
       timerElem.classList.add('pause');
       levelElem.textContent='-';
-      blindsInfoDiv.textContent = 'PAUSE';
+      blindsInfoDiv.textContent = 'BREAK';
       blindsInfoDiv.classList.add('pause');
     } else {
       timerElem.classList.remove('pause');
@@ -462,6 +504,65 @@ function showTab(tab) {
   if (tab === 'classement') {
     renderClassement();
   }
+  if (tab === 'championnat') { 
+    renderChampionnatRanking();
+  }
+  if (tab === 'points') {
+    renderPointsTable(); // Appel de la nouvelle fonction
+  }
+}
+
+/**
+ * Gère l'édition d'une cellule de points et sauvegarde le nouveau barème.
+ * @param {HTMLElement} element - La cellule <td> modifiée.
+ * @param {number} rank - Le rang associé à cette cellule.
+ */
+function handlePointEdit(element, rank) {
+    let newValue = parseInt(element.textContent.trim(), 10);
+
+    // Valider et nettoyer la valeur
+    if (isNaN(newValue) || newValue < 0) {
+        // Si la valeur n'est pas valide, on la réinitialise à l'ancienne valeur ou à 0
+        newValue = 0; 
+        element.textContent = newValue;
+    }
+
+    // Mettre à jour l'objet de données
+    const itemIndex = POINTS_BAREME_DATA.findIndex(item => item.rank === rank);
+    if (itemIndex !== -1) {
+      POINTS_BAREME_DATA[itemIndex].points = newValue;
+    }
+    
+    // Sauvegarder les données mises à jour
+    savePointsBareme(POINTS_BAREME_DATA);
+
+    // Optionnel : Vous pourriez rappeler renderPointsTable() pour rafraîchir l'affichage
+    // mais ici on se contente de mettre à jour le contenu de la cellule
+}
+
+function renderPointsTable() {
+    const container = document.getElementById('points-table-container');
+    if (!container) return;
+
+    let html = '<table class="ranking-table">';
+    
+    // Message pour indiquer l'éditabilité
+    html += '<caption>* Cliquez sur les points pour modifier la valeur.</caption>';
+    
+    // En-têtes
+    html += '<thead><tr><th>Rang</th><th>Points</th></tr></thead><tbody>';
+
+    // Rendu des lignes
+    POINTS_BAREME_DATA.forEach(item => {
+        html += `
+          <tr>
+            <td>${item.rank}</td>
+            <td contenteditable="true" onblur="handlePointEdit(this, ${item.rank})">${item.points}</td>
+          </tr>`;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
 }
 
 // Génère le tableau de structure complète
@@ -485,7 +586,7 @@ function renderStructureTable() {
     const durationDisplay = formatTime(lvl.duration); 
     
     if (lvl.isPause) {
-      html += `<tr class="pause-row"><td>${idx + 1}</td><td>Pause</td><td colspan="2"></td><td>${durationDisplay}</td></tr>`;
+      html += `<tr class="pause-row"><td>${idx + 1}</td><td>Break</td><td colspan="2"></td><td>${durationDisplay}</td></tr>`;
     } else {
       html += `<tr><td>${idx + 1}</td><td>${lvl.label}</td><td>${lvl.blinds}</td><td>${lvl.ante || '-'}</td><td>${durationDisplay}</td></tr>`;
     }
@@ -531,8 +632,9 @@ function renderClassementSimplifie() {
 
     // 3. Générer les lignes du tableau (Rang | Nom | Bouton OUT)
     rankedPlayers.forEach(p => {
-        // Supposons que p.isOut existe pour vérifier si le joueur est déjà éliminé (ce qui devrait être le cas ici)
-        const buttonText = p.isOut ? '-' : 'OUT'; 
+        const buttonText = p.rank ?  DEFAULT_POINTS_BAREME.find(item => item.rank === p.rank).points+'pts' : 'X'; 
+        const buttonClass = p.rank ? '' : 'out-btn';
+        const rankText = p.rank ? p.rank : '';
         
         // Nous allons ajouter un bouton pour POUVOIR annuler l'élimination ou modifier le statut.
         // Si le joueur est classé (rankedPlayers), le bouton est inutile, car il est déjà OUT.
@@ -543,17 +645,17 @@ function renderClassementSimplifie() {
         htmlContent += `
             <tr>
                 <td class="rank-cell">
-                    ${p.rank}.
+                    ${rankText}.
                 </td>
                 <td class="name-cell">
-                    ${p.winamax}
+                    ${p.mpla}
                 </td>
                 
                 <td class="btn-cell">
                     <button 
-                        class="ranking-out-btn out-btn"
-                        title="Eliminer ${p.winamax}"
-                        onclick="toggleOutClassement('${p.winamax}')"> ${buttonText}
+                        class="${buttonClass}"
+                        title="Eliminer ${p.mpla}"
+                        onclick="toggleOutClassement('${p.mpla}')"> ${buttonText}
                     </button>
                 </td>
             </tr>
@@ -638,8 +740,8 @@ function renderClassement() {
       
       // 1. Bouton Action : Afficher OUT uniquement si le joueur n'est pas éliminé
       actionContent = !isElimine 
-          ? `<button class="out-btn" onclick="toggleOutClassement('${p.winamax}')">OUT</button>` 
-          : ''; // Vide si le joueur est éliminé (OUT)
+          ? `<button class="in-btn" onclick="toggleOutClassement('${p.mpla}')">IN</button>` 
+          : `<button class="out-btn">OUT</button>` ; // Vide si le joueur est éliminé (OUT)
 
       // 2. Colonne Killer : Liste déroulante des joueurs encore IN
       let killerContent = p.killer || '';
@@ -648,13 +750,13 @@ function renderClassement() {
           // Filtrer les joueurs encore IN (actif: true ET rank null)
           const joueursEnJeu = classementData.filter(j => j.actif && (j.rank === null || j.rank === ''));
           
-          killerContent = `<select onchange="updateClassementCell('${p.winamax}', 'killer', this.value)">`;
+          killerContent = `<select onchange="updateClassementCell('${p.mpla}', 'killer', this.value)">`;
           killerContent += `<option value="">-- Choisir Killer --</option>`;
           
           // Ajouter les joueurs en jeu à la liste
           joueursEnJeu.forEach(j => {
-              const isSelected = j.winamax === p.killer ? 'selected' : '';
-              killerContent += `<option value="${j.winamax}" ${isSelected}>${j.winamax}</option>`;
+              const isSelected = j.mpla === p.killer ? 'selected' : '';
+              killerContent += `<option value="${j.mpla}" ${isSelected}>${j.mpla}</option>`;
           });
           killerContent += `</select>`;
       }
@@ -671,7 +773,7 @@ function renderClassement() {
       }
       
       const actifContent = `
-          <div class="toggle-switch ${toggleClass}" onclick="toggleActif('${p.winamax}')">
+          <div class="toggle-switch ${toggleClass}" onclick="toggleActif('${p.mpla}')">
               <span class="switch-slider"></span>
               <span class="switch-label">${isActif ? 'Inscrit' : ''}</span>
           </div>
@@ -700,9 +802,9 @@ function renderClassement() {
   exportAppToJSON();
 }
 
-function toggleActif(winamax) {
-    winamax = String(winamax); 
-    const index = classementData.findIndex(p => p.winamax === winamax);
+function toggleActif(mpla) {
+    mpla = String(mpla); 
+    const index = classementData.findIndex(p => p.mpla === mpla);
     if (index === -1) return;
 
     const player = classementData[index];
@@ -728,9 +830,9 @@ function toggleActif(winamax) {
     exportAppToJSON();
 }
 
-function toggleOutClassement(winamax) {
-    winamax = String(winamax); 
-    const index = classementData.findIndex(p => p.winamax === winamax);
+function toggleOutClassement(mpla) {
+    mpla = String(mpla); 
+    const index = classementData.findIndex(p => p.mpla === mpla);
     if (index === -1) return;
 
     // Détermine le nombre total de joueurs INscrits (actif: true), y compris ceux qui sont déjà éliminés.
@@ -755,8 +857,9 @@ function toggleOutClassement(winamax) {
                                     + now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         classementData[index].round = currentLevel; 
 
-        // 3. Le joueur RESTE actif: true 
-        
+        // 3. Attribution des points au joueur 
+        classementData[index].pts = DEFAULT_POINTS_BAREME.find(item => item.rank === classementData[index].rank).points;
+
         // 4. Retirer l'assignation de table/siège
         classementData[index].table = null;
         classementData[index].seat = null;
@@ -768,6 +871,7 @@ function toggleOutClassement(winamax) {
 
         // 1. Vider les données d'élimination
         classementData[index].rank = null;
+        classementData[index].pts = 0;
         classementData[index].heure = '';
         classementData[index].round = '';
         classementData[index].killer = ''; 
@@ -789,7 +893,7 @@ function toggleOutClassement(winamax) {
     // 5. Équilibrer les tables (si un joueur a quitté un siège ou doit en être réassigné)
     const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
     // On prend seulement les joueurs ACITFS/INSCRITS sans rang pour l'équilibrage
-    const joueursActifs = classementData.filter(p => p.actif && (p.rank === null || p.rank === '')).map(p => ({ winamax: p.winamax }));
+    const joueursActifs = classementData.filter(p => p.actif && (p.rank === null || p.rank === '')).map(p => ({ mpla: p.mpla }));
     classementData.forEach(p => {
         if (p.actif && (p.rank === null || p.rank === '')) {
             p.table = null;
@@ -797,13 +901,13 @@ function toggleOutClassement(winamax) {
         }
     });
     playerAssignments = playerAssignments.filter(assignment => 
-        joueursActifs.some(j => j.winamax === assignment.winamax)
+        joueursActifs.some(j => j.mpla === assignment.mpla)
     );
     const { assignments, changes } = equilibrerTables(joueursActifs, perTable, playerAssignments);
     
     playerAssignments = assignments; 
     assignments.forEach(a => {
-        const p = classementData.find(j => j.winamax === a.winamax);
+        const p = classementData.find(j => j.mpla === a.mpla);
         if (p) {
             p.table = a.table;
             p.seat = a.seat;
@@ -813,31 +917,17 @@ function toggleOutClassement(winamax) {
     if (changes.length > 0) { showPopup(changes); }
 
     // 6. Mettre à jour l'affichage
+    renderClassementSimplifie();
     renderClassement();
     renderTablesPlan(); 
     exportAppToJSON();
 }
 
-function getClassementData() {
-  const rows = Array.from(document.querySelectorAll('#classement-table tbody tr'));
-  return rows.map(tr => {
-    const tds = tr.querySelectorAll('td');
-    return {
-      nom: tds[1]?.textContent.trim(),
-      prenom: tds[2]?.textContent.trim(),
-      winamax: tds[3]?.textContent.trim(),
-      round: tds[4]?.textContent.trim(),
-      heure: tds[5]?.textContent.trim(),
-      killer: tds[6]?.textContent.trim()
-    };
-  });
-}
-
 /**
  * Assigne et équilibre les tables en minimisant les déplacements et en fermant les tables si besoin.
- * @param {Array} joueurs - Liste des joueurs à assigner [{winamax, ...}]
+ * @param {Array} joueurs - Liste des joueurs à assigner [{mpla, ...}]
  * @param {number} perTable - Nombre max de joueurs par table
- * @param {Array} oldAssignments - Assignations précédentes [{winamax, table, seat}]
+ * @param {Array} oldAssignments - Assignations précédentes [{mpla, table, seat}]
  * @returns {Object} { assignments: [...], changes: [...], tablesCassees: [...] }
  */
 function equilibrerTables(joueurs, perTable, oldAssignments = []) {
@@ -880,20 +970,20 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
 
   // 3. Place les joueurs à leur table/siège d'origine si possible (hors tables cassées)
   let assignments = [];
-  let usedWinamax = new Set();
+  let usedMPLA= new Set();
   let usedSeatsByTable = {};
   tableNumbers.forEach(tableNum => usedSeatsByTable[tableNum] = new Set());
 
   tableNumbers.forEach(tableNum => {
     let oldTable = oldByTable[tableNum] || [];
     oldTable.forEach(a => {
-      if (joueurs.find(j => j.winamax === a.winamax) && !usedSeatsByTable[tableNum].has(a.seat)) {
+      if (joueurs.find(j => j.mpla === a.mpla) && !usedSeatsByTable[tableNum].has(a.seat)) {
         assignments.push({
-          winamax: a.winamax,
+          mpla: a.mpla,
           table: tableNum,
           seat: a.seat || 1
         });
-        usedWinamax.add(a.winamax);
+        usedMPLA.add(a.mpla);
         usedSeatsByTable[tableNum].add(a.seat || 1);
       }
     });
@@ -907,11 +997,11 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     let s = 1;
     while (usedSeats.has(s)) s++;
     assignments.push({
-      winamax: j.winamax,
+      mpla: j.mpla,
       table: destTable,
       seat: s
     });
-    usedWinamax.add(j.winamax);
+    usedMPLA.add(j.mpla);
     usedSeats.add(s);
   });
 
@@ -939,21 +1029,21 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     while (usedSeats.has(newSeat)) newSeat++;
 
     // Déplace le joueur
-    assignments = assignments.filter(a => a.winamax !== toMove.winamax);
+    assignments = assignments.filter(a => a.mpla !== toMove.mpla);
     assignments.push({
-      winamax: toMove.winamax,
+      mpla: toMove.mpla,
       table: tMin, // CORRECTION: Utiliser tMin
       seat: newSeat
     });
     usedSeatsByTable[tMin].add(newSeat); 
     usedSeatsByTable[tMax].delete(toMove.seat);
-    // Note : Il faudrait aussi supprimer le joueur déplacé de usedWinamax.
+    // Note : Il faudrait aussi supprimer le joueur déplacé de usedMPLA.
     // L'algorithme actuel repose sur la mise à jour des 'assignments', ce qui fonctionne.
     // On boucle jusqu'à équilibre
   }
 
   // 6. Pour les joueurs non encore assignés, on leur attribue le premier siège libre sur une table ouverte
-  let unassignedJoueurs = joueurs.filter(j => !assignments.find(a => a.winamax === j.winamax));
+  let unassignedJoueurs = joueurs.filter(j => !assignments.find(a => a.mpla === j.mpla));
 
   unassignedJoueurs.forEach(j => {
     // Trouvez la table la moins remplie parmi les tables ouvertes
@@ -967,7 +1057,7 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     
     // Assignez le joueur
     assignments.push({
-      winamax: j.winamax,
+      mpla: j.mpla,
       table: destTable,
       seat: s
     });
@@ -977,10 +1067,10 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   // 7. Changements d'assignation (pour la popup)
   let changes = [];
   assignments.forEach(a => {
-    let old = oldAssignments.find(o => o.winamax === a.winamax);
+    let old = oldAssignments.find(o => o.mpla === a.mpla);
     if (!old || old.table !== a.table || old.seat !== a.seat) {
       changes.push({
-        winamax: a.winamax,
+        mpla: a.mpla,
         from: old ? { table: old.table, seat: old.seat } : { table: '-', seat: '-' },
         to: { table: a.table, seat: a.seat }
       });
@@ -994,8 +1084,8 @@ function syncSelectedPlayersIndexes() {
   selectedPlayersIndexes = [];
   const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
   rows.forEach((tr, idx) => {
-    const winamax = tr.querySelectorAll('td')[4]?.textContent.trim();
-    if (classementData.some(p => p.winamax === winamax)) {
+    const mpla = tr.querySelectorAll('td')[4]?.textContent.trim();
+    if (classementData.some(p => p.mpla === mpla)) {
       selectedPlayersIndexes.push(idx);
       // Coche la case dans le DOM pour l'affichage immédiat
       const cb = tr.querySelector('input[type="checkbox"]');
@@ -1006,7 +1096,7 @@ function syncSelectedPlayersIndexes() {
 
 function assignSeats() {
   // Prend uniquement les joueurs actif
-  const joueurs = classementData.filter(p => p.actif).map(p => ({ winamax: p.winamax }));
+  const joueurs = classementData.filter(p => p.actif).map(p => ({ mpla: p.mpla }));
   if (joueurs.length === 0) {
     alert("Aucun joueur inscrit !");
     return;
@@ -1017,10 +1107,10 @@ function assignSeats() {
 
   // Construit oldAssignments à partir de classementData pour les joueurs payés
   const oldAssignments = joueurs.map(j => {
-    const p = classementData.find(p => p.winamax === j.winamax);
+    const p = classementData.find(p => p.mpla === j.mpla);
     return (p && p.table && p.seat && !isNaN(parseInt(p.table)) && !isNaN(parseInt(p.seat)))
-      ? { winamax: p.winamax, table: parseInt(p.table), seat: parseInt(p.seat) }
-      : { winamax: j.winamax };
+      ? { mpla: p.mpla, table: parseInt(p.table), seat: parseInt(p.seat) }
+      : { mpla: j.mpla };
   });
 
   // Appel à la fonction d'équilibrage stricte
@@ -1028,21 +1118,21 @@ function assignSeats() {
 
   // Mets à jour classementData pour TOUS les joueurs payés
   assignments.forEach(a => {
-    let p = classementData.find(p => p.winamax === a.winamax);
+    let p = classementData.find(p => p.mpla === a.mpla);
     if (p) {
       p.table = a.table;
       p.seat = a.seat;
     } else {
       classementData.push({
-        winamax: a.winamax,
-        round: '', heure: '', killer: '', out: false, rank: '', table: a.table, seat: a.seat, actif: true
+        mpla: a.mpla,
+        round: '', heure: '', killer: '', out: false, rank: '', table: a.table, seat: a.seat, actif: true, pts: 0,
       });
     }
   });
 
   // Mets à jour playerAssignments
   playerAssignments = assignments.map(a => ({
-    winamax: a.winamax,
+    mpla: a.mpla,
     table: a.table,
     seat: a.seat
   }));
@@ -1070,7 +1160,7 @@ function showPopup(changes) {
     htmlContent += '<ul style="list-style: none; padding-left: 0;">';
 
     changes.forEach(c => {
-        const playerName = c.winamax;
+        const playerName = c.mpla;
         const fromTable = c.from.table !== '-' ? `table ${c.from.table} siège ${c.from.seat}` : 'N/A';
         const toTable = `table ${c.to.table} siège ${c.to.seat}`;
         
@@ -1099,7 +1189,7 @@ function renderTablesPlan() {
     .map(p => ({
       table: parseInt(p.table),
       seat: parseInt(p.seat),
-      winamax: p.winamax
+      mpla: p.mpla
     }));
 
   if (players.length === 0) {
@@ -1114,7 +1204,7 @@ function renderTablesPlan() {
   const tables = {};
   players.forEach(p => {
     if (!tables[p.table]) tables[p.table] = [];
-    tables[p.table][p.seat - 1] = p.winamax;
+    tables[p.table][p.seat - 1] = p.mpla;
   });
 
   // Génère le HTML
@@ -1125,11 +1215,11 @@ function renderTablesPlan() {
       <table style="margin:auto; background:#222; color:#fff; border-radius:8px; min-width:200px;">
         <tbody>`;
     for (let s = 0; s < perTable; s++) {
-      const winamax = tables[tableNum][s];
-      if (winamax) {
+      const mpla = tables[tableNum][s];
+      if (mpla) {
         html += `<tr>
           <td style="width:3em;">${s + 1}</td>
-          <td style="font-weight:bold; font-size:1.1em;">${winamax || '-'}</td>
+          <td style="font-weight:bold; font-size:1.1em;">${mpla || '-'}</td>
         </tr>`;
       } else {
         html += `<tr>
@@ -1194,6 +1284,10 @@ function restoreAppFromLocalStorage() {
     console.log("restoring structureTitle ...");
     console.log(structureTitle);
 
+    if (appState.championshipData) {
+        championshipData = appState.championshipData;
+    }
+
     // Recharge l’affichage
     updateDisplay();
     if (typeof renderTablesPlan === 'function') renderTablesPlan();
@@ -1221,8 +1315,9 @@ function exportAppToJSON() {
         playerAssignments: playerAssignments,
         classementData: classementData,
         currentRank: currentRank, 
-        joueurAEliminerWinamax: joueurAEliminerWinamax,
+        joueurAEliminerMPLA: joueurAEliminerMPLA,
         selectedPlayersIndexes: selectedPlayersIndexes,
+        championshipData: championshipData
     };
     const jsonString = JSON.stringify(appData);
     
@@ -1236,8 +1331,8 @@ function exportAppToJSON() {
     console.log(jsonString);
 }
 
-function updateClassementCell(winamax, field, value) {
-  const index = classementData.findIndex(p => p.winamax === winamax);
+function updateClassementCell(mpla, field, value) {
+  const index = classementData.findIndex(p => p.mpla === mpla);
   if (index !== -1) {
     classementData[index][field] = value;
     exportAppToJSON();
@@ -1310,3 +1405,193 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
   }
 });
+
+function parseCSV_champ(csvText) {
+const lines = csvText.split('\n').filter(line => line.trim() !== '');
+    if (lines.length < 2) return []; // Moins de 2 lignes = pas de données
+    
+    // CARTE DE CORRESPONDANCE : CSV Header -> Clé JS
+    const keyMapping = {
+        'prenom': 'Prénom', 
+        'mpla': 'Pseudo MPLA', 
+        'winamax': 'Pseudo Winamax', 
+        'rank': 'Rank', 
+        'points': 'Nombre points' 
+    };
+
+    // Trouver les indices des colonnes requises dans le CSV original
+    const columnIndices = {};
+    columnIndices['prenom'] = 0;
+    columnIndices['mpla'] = 1;
+    columnIndices['winamax'] = 2;
+    columnIndices['rank'] = 3;
+    columnIndices['points'] = 4;
+    
+    const data = [];
+
+    // Traitement des lignes de données (à partir de la 4ème ligne)
+    for (let i = 7; i < lines.length; i++) {
+        const currentLine = lines[i];
+        const values = currentLine.split(',');
+        
+        console.log(values);
+
+        const player = {};
+        
+        // Extraction et standardisation des colonnes
+        Object.keys(columnIndices).forEach(standardKey => {
+            const index = columnIndices[standardKey];
+            // Nettoyage de la valeur (trim et suppression des guillemets)
+            player[standardKey] = values[index].trim().replace(/"/g, ''); 
+        });
+        
+        // Filtrer les lignes vides
+        if (Object.values(player).some(val => val !== '')) {
+            data.push(player);
+        }
+    }
+    
+    return data;
+  }
+
+// -------------------------------------------------------------------------
+// FONCTIONS DE GESTION DU CHAMPIONNAT (FORMAT CSV)
+// -------------------------------------------------------------------------
+async function loadChampionnatDataFromURL() {
+    const urlInput = document.getElementById('championship-url');
+    const statusMessage = document.getElementById('championnat-status-message');
+    const url = urlInput.value.trim();
+
+    if (!url || !url.includes('output=csv')) {
+        statusMessage.textContent = 'Veuillez entrer une URL valide au format CSV (doit contenir "output=csv").';
+        return;
+    }
+
+    statusMessage.textContent = 'Chargement des données CSV en cours...';
+
+    try {
+        // Récupération du texte brut CSV
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Erreur de chargement de l\'URL CSV.');
+        
+        const csvText = await response.text();
+        
+        // Analyse du texte CSV
+        championshipData = parseCSV_champ(csvText); 
+        
+        if (championshipData.length === 0) {
+            throw new Error('Aucune donnée de classement trouvée dans le fichier CSV.');
+        }
+
+        // Sauvegarde réussie
+        exportAppToJSON();
+        statusMessage.textContent = `Championnat chargé avec succès (${championshipData.length} lignes).`;
+        renderChampionnatRanking();
+
+    } catch (e) {
+        statusMessage.textContent = `Erreur de chargement: ${e.message}.`;
+        console.error("Erreur de chargement du Championnat:", e);
+    }
+}
+
+// Fonction placeholder pour l'analyse (à adapter)
+function extractDataFromTable(tbody) {
+    const data = [];
+    // Logique pour itérer sur les <tr> et <td> du tbody
+    tbody.querySelectorAll('tr').forEach((row, index) => {
+        if (index === 0) return; // Sauter la ligne d'en-tête (si elle est là)
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 1) {
+            data.push({
+                rank: cells[3]?.textContent.trim() || '',
+                name: cells[1]?.textContent.trim() || '',
+                points: cells[4]?.textContent.trim() || ''
+                // Ajoutez toutes les colonnes nécessaires
+            });
+        }
+    });
+    return data;
+}
+
+function renderChampionnatRanking() {
+    const container = document.getElementById('championnat-ranking-container');
+    const statusMessage = document.getElementById('championnat-status-message');
+    
+    if (!container) return;
+
+    if (!championshipData || championshipData.length === 0) {
+        container.innerHTML = '<p>Aucun classement de championnat à afficher.</p>';
+        statusMessage.textContent = 'Aucune donnée de championnat chargée.';
+        return;
+    }
+    
+    // Ceci est crucial pour que la mise en évidence du top 33% s'applique correctement
+    championshipData.sort((a, b) => {
+        // Convertir la chaîne de caractères 'rank' en nombre pour un tri numérique
+        const rankA = parseInt(a.rank, 10);
+        const rankB = parseInt(b.rank, 10);
+        
+        // Gérer les cas où le rang n'est pas un nombre (pour les mettre à la fin, par exemple)
+        if (isNaN(rankA)) return 1;
+        if (isNaN(rankB)) return -1;
+
+        return rankA - rankB;
+    });
+
+    
+    // CALCUL DU SEUIL DES 33%
+    const totalPlayers = championshipData.length;
+    // Math.ceil assure que même si 33% donne un nombre décimal, on inclut le joueur correspondant (arrondi au supérieur)
+    const top33Count = Math.ceil(totalPlayers * 0.33); 
+    
+
+    // DÉFINITION DE L'ORDRE ET DES LABELS AFFICHÉS
+    const columnsToDisplay = [
+        { key: 'rank', label: 'Rang' },
+        { key: 'prenom', label: 'Prénom' },
+        { key: 'mpla', label: 'Pseudo MPLA' },
+        { key: 'winamax', label: 'Pseudo Winamax' },
+        { key: 'points', label: 'Points' },
+        { key: 'pts', label: 'PointsVirtuels' }
+    ];
+
+    statusMessage.textContent = `Affichage du classement (${championshipData.length} joueurs). Les ${top33Count} premiers sont mis en évidence.`;
+
+    // Rendu du tableau
+    let html = '<table class="ranking-table">';
+    
+    // Ligne d'en-têtes
+    html += '<thead><tr>';
+    columnsToDisplay.forEach(col => {
+        html += `<th>${col.label}</th>`; 
+    });
+    html += '</tr></thead><tbody>';
+    
+    // Lignes de données
+    championshipData.forEach(p => {
+        // Le rang est maintenant lu après le tri, garantissant la bonne position
+        const rank = parseInt(p.rank); 
+        
+        // Ajout de la classe si le joueur fait partie du top 33%
+        const rowClass = (rank > 0 && rank <= top33Count) ? 'top-33-percent' : '';
+        
+        html += `<tr class="${rowClass}">`;
+        columnsToDisplay.forEach(col => {
+          if(col.key === "points") {
+            const foundItem = classementData.find(item => item.mpla.trim().toLowerCase() === p.mpla.trim().toLowerCase());
+            console.log("foundItem:");
+            console.log(foundItem);
+            addPts = classementData.find(item => item.mpla === p.mpla).pts;
+            console.log(addPts);
+            field=addPts ? p[col.key]+'(+'+addPts+')' : p[col.key];
+            html += `<td>${field || ''}</td>`; 
+          } else {
+            html += `<td>${p[col.key] || ''}</td>`; 
+          }
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}

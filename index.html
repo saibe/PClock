@@ -18,6 +18,9 @@
           <button class="tab-btn" onclick="showTab('tables')">Tables</button>
           <button class="tab-btn" onclick="showTab('structure')">Structure</button>
           <button class="tab-btn" onclick="showTab('players')">Joueurs</button>
+          <button class="tab-btn" onclick="showTab('championnat')">Championnat</button>
+          <button class="tab-btn" onclick="showTab('classement')">Classement</button>
+          <button class="tab-btn" onclick="showTab('points')">Points</button>
         </div>
         
         <div id="datetime" class="datetime"></div>
@@ -72,6 +75,23 @@
       <div id="players-table-container"></div>
     </div>
 
+    <div id="tab-championnat" class="tab-content">
+        <h2>Classement du Championnat</h2>
+        
+        <div id="championnat-loader-area">
+            <p id="championnat-status-message">Aucune donnée de championnat chargée.</p>
+            
+            <label for="championship-url" style="display: block; margin-top: 1em;">URL du Google Sheet (publié en HTML) :</label>
+            <input type="url" id="championship-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmTg2CpIYfnl02qyU4txWYk89KXV9hpfC8KMENBoDcreD2YKFhSYTEPNXxWUqBGmAZj57qezldW-WX/pub?output=csv" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">            
+            <button onclick="loadChampionnatDataFromURL()" style="padding: 0.8em 2em;">
+                Charger le Championnat
+            </button>
+        </div>
+        <div id="championnat-ranking-container" style="margin-bottom: 2em;">
+        </div>
+        
+    </div>
+
     <div id="tab-classement" class="tab-content">
       <!-- Onglet Classement -->
       <button onclick="syncJoueursToClassement()">Sync joueurs</button>
@@ -81,7 +101,12 @@
       <button onclick="assignSeats()">Assigner sièges</button>
       <div id="classement-container"></div>
     </div>
-    
+
+    <div id="tab-points" class="tab-content">
+      <h2 class="title" style="margin-bottom: 1em;">Barème de Points du Championnat</h2>
+      <div id="points-table-container">
+      </div>
+    </div>
   </div>
   <script src="script.js"></script>
   

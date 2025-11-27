@@ -491,8 +491,7 @@ body {
     /* Alignement du rang à droite */
     text-align: right;
     width: 15%; /* Pour donner assez d'espace au rang */
-    padding-right: 0.5em; 
-    
+    /* padding-right: 0.5em; */
     /* Style visuel du rang */
     color: #ffb300; 
     font-weight: bold;
@@ -511,12 +510,12 @@ body {
 
 /* Retirer le padding vertical pour que la liste soit compacte */
 .simple-ranking-table td {
-    padding: 0.1em 0;
+    /* padding: 0.1em 0; */
 }
 simple-ranking-table .btn-cell {
     width: 20%; /* Pour donner de la place au bouton */
     text-align: right;
-    padding-left: 0.5em;
+    /* padding-left: 0.5em; */
 }
 
 /* Style du bouton "OUT" dans le classement */
@@ -531,8 +530,57 @@ simple-ranking-table .btn-cell {
     font-size: 0.9em;
     line-height: 1; /* Pour être compact */
 }
+/* style.css - Styles pour le classement du championnat (mimétisme Google Sheets) */
 
-/* Assurer un peu plus d'espace sur les lignes du tableau */
-.simple-ranking-table td {
-    padding: 0.3em 0; /* Augmenter le padding vertical */
+/* Le conteneur principal du tableau */
+.ranking-table {
+    width: 100%;
+    border-collapse: collapse; /* Assure que les bordures de cellules se rejoignent */
+    background-color: #ffffff; /* Fond blanc (comme Google Sheets) */
+    color: #333; /* Texte sombre pour la lisibilité sur fond clair */
+    font-size: 0.95em;
+    border: 1px solid #ccc; /* Bordure extérieure légère */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
+}
+
+/* En-têtes de tableau (lignes du thead) */
+.ranking-table thead th {
+    background-color: #f8f8f8; /* Gris très clair pour les en-têtes */
+    color: #333;
+    font-weight: bold;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #ddd; /* Bordures d'en-tête légères */
+    border-top: none; /* Optionnel : pour un look plus épuré */
+}
+
+/* Cellules du corps du tableau */
+.ranking-table tbody td {
+    padding: 8px 12px;
+    border: 1px solid #eee; /* Bordures de cellules très fines */
+}
+
+/* Bandes alternées pour améliorer la lecture */
+.ranking-table tbody tr:nth-child(even) {
+    background-color: #fcfcfc; /* Blanc cassé pour les lignes paires */
+}
+
+/* Effet de survol */
+.ranking-table tbody tr:hover {
+    background-color: #e6f7ff; /* Surlignage bleu très clair */
+    cursor: default;
+}
+
+
+/* MISE EN AVANT: Style Top 33% pour le Fond Clair (Qualification Zone) */
+.top-33-percent {
+    /* Vert pâle et discret */
+    background-color: #d8f5d8 !important; 
+    font-weight: bold;
+    font-size: larger;
+    border-left: 5px solid #66bb6a; /* Bordure gauche verte distincte */
+}
+
+.top-33-percent td {
+    color: #333; /* Assurez-vous que le texte reste sombre et lisible */
 }
