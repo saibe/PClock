@@ -9,9 +9,34 @@ body {
   height: 100%;
   margin: 0;
 }
+/* container secondaire droit*/
+.container-R {
+  background: #333;
+  padding: 0em 1em;
+  border-radius: 16px;
+  box-shadow: 0 0 24px #000a;
+  text-align: right;
+  min-width: 350px;
+  width:25%;
+  height: 100%;
+  margin-top: 0;
+}
+/* container secondaire droit*/
+.container-L {
+  background: #333;
+  padding: 0em 1em;
+  border-radius: 16px;
+  box-shadow: 0 0 24px #000a;
+  text-align: left;
+  min-width: 350px;
+  width:25%;
+  height: 100%;
+  margin-top: 0;
+}
+/* container principal centre*/
 .container {
   background: #333;
-  padding: 2em 3em;
+  padding: 0em 0em;
   border-radius: 16px;
   box-shadow: 0 0 24px #000a;
   text-align: center;
@@ -35,9 +60,10 @@ body {
     gap: 0.5em; /* Espace entre chaque bouton */
 }
 .datetime {
-  font-size: 2em;
+  font-size: 1.5em;
   color: #ffb300;
-  margin-bottom: 0;
+  margin-bottom: 1em;
+  border-bottom: 1px solid #555;
 }
 .tabs {
   display: flex;
@@ -89,30 +115,24 @@ body {
   display: block;
 }
 #timer {
-  font-size: 5em;
+  font-size: 8em;
   letter-spacing: 0.1em;
 }
 #timer.pause {
   background: darkred;
   color: #fff;
-  font-size: 5em;
+  font-size: 8em;
   letter-spacing: 0.1em;
 }
 #level {
-  font-size: 2em;
+  font-size: 3em;
 }
 #blinds-info {
   white-space: nowrap;
   overflow: hidden;
   text-align: center;
-    /* Utilisation de clamp() pour un design optimal */
-    /* Taille de police : 
-       Minimum: 1em (pour la lisibilité)
-       Idéal: 5vw (5% de la largeur du viewport)
-       Maximum: 5em (pour éviter que ça ne devienne trop énorme sur grands écrans)
-    */
-    font-size: clamp(10px, 25vw, 200px);
-    font-weight: bold;
+  font-size: 10em;
+  font-weight: bold;
 }
 #blinds-info.pause {
   background: darkred;
@@ -121,12 +141,11 @@ body {
 }
 #next-level-info {
   margin: 0.5em 0 0.2em 0;
-  font-size: 2em;
+  font-size: 2.25em;
   color: #bbb;
 }
 #next-break-info {
-  /*margin: 0.2em 0 1em 0;*/
-  font-size: 2em;
+  font-size: 2.25em;
   color: #bbb;
 }
 .controls button {
@@ -457,9 +476,15 @@ body {
   border-left: 1px solid #555; /* Séparateur visuel */
   font-size: 2em;
 }
+
 /* S'assurer que les titres d'horloge sont grands */
+#players-in-game, #average-stack {
+  margin-top: 1em;  
+  font-size: 2em;
+}
 #avg-stack-value, #current-players{
-    font-size: 2em;
+  font-size: 3em ! important;
+  font-weight: bold;
 }
 /* S'assurer que les titres d'horloge sont grands */
 .grid-col-2-3 #level {
@@ -508,10 +533,6 @@ body {
     text-overflow: ellipsis; /* Ajoute des "..." si le nom est coupé */
 }
 
-/* Retirer le padding vertical pour que la liste soit compacte */
-.simple-ranking-table td {
-    /* padding: 0.1em 0; */
-}
 simple-ranking-table .btn-cell {
     width: 20%; /* Pour donner de la place au bouton */
     text-align: right;
@@ -535,9 +556,10 @@ simple-ranking-table .btn-cell {
 /* Le conteneur principal du tableau */
 .ranking-table {
     width: 100%;
+    border-collapse: collapse;
+    background-color: #222;
     border-collapse: collapse; /* Assure que les bordures de cellules se rejoignent */
-    background-color: #ffffff; /* Fond blanc (comme Google Sheets) */
-    color: #333; /* Texte sombre pour la lisibilité sur fond clair */
+    color: #EEE; /* Texte sombre pour la lisibilité sur fond clair */
     font-size: 0.95em;
     border: 1px solid #ccc; /* Bordure extérieure légère */
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
@@ -545,10 +567,10 @@ simple-ranking-table .btn-cell {
 
 /* En-têtes de tableau (lignes du thead) */
 .ranking-table thead th {
-    background-color: #f8f8f8; /* Gris très clair pour les en-têtes */
-    color: #333;
+    background-color: #EEE; /* Gris très clair pour les en-têtes */
+    color: #222;
     font-weight: bold;
-    text-align: left;
+    text-align: center;
     padding: 8px 12px;
     border: 1px solid #ddd; /* Bordures d'en-tête légères */
     border-top: none; /* Optionnel : pour un look plus épuré */
@@ -557,30 +579,32 @@ simple-ranking-table .btn-cell {
 /* Cellules du corps du tableau */
 .ranking-table tbody td {
     padding: 8px 12px;
-    border: 1px solid #eee; /* Bordures de cellules très fines */
+    border: 1px solid #444; /* Bordures de cellules très fines */
 }
 
 /* Bandes alternées pour améliorer la lecture */
 .ranking-table tbody tr:nth-child(even) {
-    background-color: #fcfcfc; /* Blanc cassé pour les lignes paires */
+    background-color: #111; /* Blanc cassé pour les lignes paires */
 }
-
-/* Effet de survol */
-.ranking-table tbody tr:hover {
-    background-color: #e6f7ff; /* Surlignage bleu très clair */
-    cursor: default;
+.ranking-virtual-in {
+  font-weight:bold;
+  color:lightseagreen;
+/*  background-color:lightyellow ! important */
 }
-
-
+.ranking-virtual-out {
+  font-weight:normal;
+/*  color:beige; */
+}
 /* MISE EN AVANT: Style Top 33% pour le Fond Clair (Qualification Zone) */
 .top-33-percent {
-    /* Vert pâle et discret */
-    background-color: #d8f5d8 !important; 
+    background-color: #232 !important; /* Couleur pour les lignes impaires */
     font-weight: bold;
     font-size: larger;
-    border-left: 5px solid #66bb6a; /* Bordure gauche verte distincte */
+    border-left: 10px solid #24ba2c; /* Bordure gauche verte distincte */
 }
-
-.top-33-percent td {
-    color: #333; /* Assurez-vous que le texte reste sombre et lisible */
+.top-33-percent-even {
+    background-color: #232 !important; /* Couleur pour les lignes impaires */
+    font-weight: bold;
+    font-size: larger;
+    border-left: 10px solid #24ba2c; /* Bordure gauche verte distincte */
 }

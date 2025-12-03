@@ -1,6 +1,5 @@
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
 const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFOKpdZMMO9sPcpWH6mrQW2S-eaxu-8B6YTZ4ZM93WgbAXuDG8-9nkrO3D644WmxAqHGdm07FGkh7H/pub?gid=137620678&single=true&output=csv';
-const POINTS_STORAGE_KEY = 'championshipPointsBareme';
 
 let levels = [];
 let currentLevel = 0;
@@ -18,7 +17,6 @@ let currentRank = 1;
 let joueurAEliminerMPLA = null;
 let startingStack = 20000;
 let championshipData = null;
-let POINTS_BAREME_DATA = getPointsBareme();
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -29,7 +27,8 @@ const fontRatios = {
   nextLevel: 0.3,
   nextBreak: 0.3
 };
-// --- Barème de points par défaut (jusqu'au rang 50) ---
+
+const POINTS_STORAGE_KEY = 'championshipPointsBareme';
 const DEFAULT_POINTS_BAREME = [
     { rank:  1, points: 500 }, { rank:  2, points: 450 }, { rank:  3, points: 400 },
     { rank:  4, points: 350 }, { rank:  5, points: 300 }, { rank:  6, points: 250 },
@@ -44,6 +43,7 @@ const DEFAULT_POINTS_BAREME = [
 for (let i = 25; i <= 50; i++) {
     DEFAULT_POINTS_BAREME.push({ rank: i, points: 5 });
 }
+let POINTS_BAREME_DATA = getPointsBareme();
 
 /**
  * Charge le barème depuis localStorage ou utilise la version par défaut.
@@ -88,7 +88,14 @@ function syncJoueursToClassement() {
     nom: j.nom,
     prenom: j.prenom,
     mpla: j.mpla,
-    round: '', heure: '', killer: '', out: false, rank: '', table: '', seat: '', actif: false, pts: 0,
+    round: '', 
+    heure: '', 
+    killer: '', 
+    rank: '', 
+    table: '', 
+    seat: '', 
+    actif: false, 
+    pts: 0,
   }));
 
   // Réinitialise la liste des anciennes assignations
@@ -165,7 +172,7 @@ function updatePlayerStatusDisplay() {
     // Mise à jour des éléments dans la colonne 1
     const currentPlayersSpan = document.getElementById('current-players');
     if (currentPlayersSpan) {
-        currentPlayersSpan.textContent = playersIn;
+        currentPlayersSpan.textContent = playersIn+'/'+totalRegistered;
     }
 
     const outPlayersSpan = document.getElementById('out-players');
@@ -321,6 +328,7 @@ function updateDisplay() {
     // Appel à la mise à jour des stats dans l'autre colonne
     updatePlayerStatusDisplay(); 
     renderClassementSimplifie();
+    renderChampionnatRanking();
 }
 
 function formatTime(seconds) {
@@ -615,8 +623,25 @@ function renderClassementSimplifie() {
     );
 
     // 2. Trier par rang final (du plus petit au plus grand, ex: 1er, 2e, 3e...)
-    rankedPlayers.sort((a, b) => parseInt(a.rank) - parseInt(b.rank));
-    
+    rankedPlayers.sort((a, b) => {
+        
+        const rankA = a.rank === '' || a.rank === null ? 0 : parseInt(a.rank);
+        const rankB = b.rank === '' || b.rank === null ? 0 : parseInt(b.rank);
+
+        // Si rankA ou rankB est 0 (signifiant '' ou null), ils seront considérés comme les plus petits
+        // (donc premiers dans l'ordre croissant).
+        
+        // Si les deux sont en jeu (rankA == 0 et rankB == 0),
+        // vous pouvez ajouter ici un critère de tri secondaire (ex: par points ou par nom).
+        if (rankA === 0 && rankB === 0) {
+            // Optionnel : Critère de tri secondaire pour les joueurs encore en jeu.
+            // Ici, on trie par nom (alphabétique) :
+            return a.mpla.localeCompare(b.mpla);
+        }
+        
+        return rankA - rankB; // Tri ascendant normal (1, 2, 3...)
+    });    
+
     let htmlContent = '';
     
     const container = document.getElementById('simple-ranking-container');
@@ -1105,11 +1130,25 @@ function syncSelectedPlayersIndexes() {
 
 function assignSeats() {
   // Prend uniquement les joueurs actif
-  const joueurs = classementData.filter(p => p.actif).map(p => ({ mpla: p.mpla }));
+      console.log(classementData);
+  classementData.forEach(j => {
+    if (j.actif && j.rank > 0) {
+      console.log("Joueur: "+j.mpla+" (table:"+j.table+", siege:"+j.seat+")");
+      j.table = '';
+      j.seat = '';
+      console.log("==> Joueur: "+j.mpla+" (table:"+j.table+", siege:"+j.seat+")");
+    }
+  });
+      console.log(classementData);
+  const joueurs = classementData.filter(p => p.actif && (p.rank == '' || p.rank == null)).map(p => ({ mpla: p.mpla }));
+  console.log("++JOUEURS:");
+  console.log(joueurs);
   if (joueurs.length === 0) {
-    alert("Aucun joueur inscrit !");
+    alert("Aucun joueur en jeu !");
     return;
   }
+  console.log("JOUEURS:");
+  console.log(joueurs);
 
   // Nombre de joueurs max par table
   const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
@@ -1119,11 +1158,14 @@ function assignSeats() {
     const p = classementData.find(p => p.mpla === j.mpla);
     return (p && p.table && p.seat && !isNaN(parseInt(p.table)) && !isNaN(parseInt(p.seat)))
       ? { mpla: p.mpla, table: parseInt(p.table), seat: parseInt(p.seat) }
-      : { mpla: j.mpla };
+      : { mpla: j.mpla, table: '', seat: ''};
   });
 
   // Appel à la fonction d'équilibrage stricte
+console.log("==>oldAssignments");
+console.log(oldAssignments);
   const { assignments, changes, tablesCassees } = equilibrerTables(joueurs, perTable, oldAssignments);
+console.log(assignments);
 
   // Mets à jour classementData pour TOUS les joueurs payés
   assignments.forEach(a => {
@@ -1134,7 +1176,14 @@ function assignSeats() {
     } else {
       classementData.push({
         mpla: a.mpla,
-        round: '', heure: '', killer: '', out: false, rank: '', table: a.table, seat: a.seat, actif: true, pts: 0,
+        round: '',
+        heure: '',
+        killer: '',
+        rank: '',
+        table: a.table,
+        seat: a.seat,
+        actif: true,
+        pts: 0,
       });
     }
   });
@@ -1194,7 +1243,7 @@ function renderTablesPlan() {
   // On utilise classementData pour récupérer les joueurs avec une table et un siège
   // On ne prend que les joueurs non éliminés et qui ont une table/siège
   let players = classementData
-    .filter(p => !p.out && p.table && p.seat)
+    .filter(p => (p.rank === '' || p.rank === null) && p.table && p.seat)
     .map(p => ({
       table: parseInt(p.table),
       seat: parseInt(p.seat),
@@ -1551,7 +1600,12 @@ function renderChampionnatRanking() {
 
         return (pointB+addPtsB) - (pointA+addPtsA);
     });
-
+    
+    let newrank = 1;
+    championshipData.forEach(p => {
+      p.rank = newrank;
+      newrank = newrank +1;
+    });
     
     // CALCUL DU SEUIL DES 33%
     const totalPlayers = championshipData.length;
@@ -1562,17 +1616,18 @@ function renderChampionnatRanking() {
     // DÉFINITION DE L'ORDRE ET DES LABELS AFFICHÉS
     const columnsToDisplay = [
         { key: 'rank', label: 'Rang' },
-        { key: 'prenom', label: 'Prénom' },
+//        { key: 'prenom', label: 'Prénom' },
         { key: 'mpla', label: 'Pseudo MPLA' },
-        { key: 'winamax', label: 'Pseudo Winamax' },
+//        { key: 'winamax', label: 'Pseudo Winamax' },
         { key: 'points', label: 'Points' },
-        { key: 'pts', label: 'PointsVirtuels' }
+        { key: 'pts', label: '' }
     ];
 
     statusMessage.textContent = `Affichage du classement (${championshipData.length} joueurs). Les ${top33Count} premiers sont mis en évidence.`;
+    statusMessage.style.display = 'none';
 
     // Rendu du tableau
-    let html = '<table class="ranking-table">';
+    let html = '<table class="simple-ranking-table">';
     
     // Ligne d'en-têtes
     html += '<thead><tr>';
@@ -1587,22 +1642,24 @@ function renderChampionnatRanking() {
         const rank = parseInt(p.rank); 
         
         // Ajout de la classe si le joueur fait partie du top 33%
-        const rowClass = (rank > 0 && rank <= top33Count) ? 'top-33-percent' : '';
-        
+        let rowClass = '';
+        if (rank > 0 && rank <= top33Count) {
+          rowClass = (rank % 2 == 0) ? 'top-33-percent-even': 'top-33-percent';
+        }
         addPts = classementData.find(item => item.mpla === p.mpla).pts;
         console.log(addPts);
         isRank = classementData.find(item => item.mpla === p.mpla).rank;
         if (addPts>0){
-          style = (isRank > 0) ? "color:purple;background-color:lightyellow ! important" : "background-color:yellow ! important";
-        } else {
-          style = '';
+          rowClass += (isRank > 0) ? " ranking-virtual-out" : " ranking-virtual-in";
         }
 
-        html += `<tr style="${style}" class="${rowClass}">`;
+        html += `<tr class="${rowClass}">`;
         columnsToDisplay.forEach(col => {
           if(col.key === "pts") {
             field=addPts ? '+'+addPts : '';
             html += `<td>${field}</td>`; 
+          } else if(col.key === "mpla") {
+            html += `<td style="text-align:center">${p[col.key] || ''}</td>`; 
           } else {
             html += `<td>${p[col.key] || ''}</td>`; 
           }

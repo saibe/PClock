@@ -4,8 +4,21 @@
   <meta charset="UTF-8">
   <title>Poker Clock</title>
   <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
+  <div class="container-L">
+    <div id="datetime" class="datetime"></div>
+    <div id="players-in-game">
+      <u>Joueurs:</u><br/><span id="current-players">--</span>
+    </div>
+    <div id="average-stack">
+      <u>Tapis moyen:</u><br/><span id="avg-stack-value">--</span>
+    </div>
+  
+    <h3 style="color:#ffb300;text-align:center;border-top: 1px solid #555;padding-top:0.5em;margin:0;">Classement tournoi</h3>
+    <div id="simple-ranking-container"></div>
+  </div>
   <div class="container">
     <div class="title">
       <h1 id="structure-title" style="display:inline;">Structure Tournoi</h1>
@@ -19,20 +32,14 @@
           <button class="tab-btn" onclick="showTab('structure')">Structure</button>
           <button class="tab-btn" onclick="showTab('players')">Joueurs</button>
           <button class="tab-btn" onclick="showTab('championnat')">Championnat</button>
-          <button class="tab-btn" onclick="showTab('classement')">Classement</button>
           <button class="tab-btn" onclick="showTab('points')">Points</button>
-        </div>
-        
-        <div id="datetime" class="datetime"></div>
+        </div>        
     </div>
 
-<div id="tab-tournoi" class="tab-content active">
+    <div id="tab-tournoi" class="tab-content active">
   
-  <div class="tournoi-double-grid">
-    
-    <div class="grid-col-2-3">
-      <h3 id="level" style="margin-top:0; text-align:center;">Niveau 1</h3>
-      <div id="timer" style="font-size: 8vw; text-align:center;">--:--</div>
+      <h3 id="level">Niveau 1</h3>
+      <div id="timer">--:--</div>
       <div id="blinds-info">-</div>
       <div id="next-level-info" style="text-align:center; margin-top: 1em;"></div>
       <div id="next-break-info" style="text-align:center;"></div>
@@ -45,24 +52,8 @@
       </div>
     </div>
 
-    <div class="grid-col-1-3">
-      <div id="players-in-game">
-        Joueurs en jeu : <span id="current-players" style="font-weight:bold;">--</span>
-      </div>
-      <div id="average-stack">
-        Tapis moyen : <span id="avg-stack-value" style="font-weight:bold;">--</span>
-      </div>
-      
-      <h3 style="border-top: 1px solid #555; margin:0; margin-top: 1em;">Classement</h3>
-      <div id="simple-ranking-container">
-        </div>
-    </div>
-  </div>
-  
-  </div>
     <div id="tab-tables" class="tab-content">
-      <div style="margin-bottom:1em;">
-      </div>
+      <div style="margin-bottom:1em;"></div>
       <div id="tables-plan"></div>
     </div>
 
@@ -76,46 +67,44 @@
     </div>
 
     <div id="tab-championnat" class="tab-content">
-        <h2>Classement du Championnat</h2>
-        
-        <div id="championnat-loader-area">
-            <p id="championnat-status-message">Aucune donnée de championnat chargée.</p>
-            
-            <label for="championship-url" style="display: block; margin-top: 1em;">URL du Google Sheet (publié en HTML) :</label>
-            <input type="url" id="championship-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmTg2CpIYfnl02qyU4txWYk89KXV9hpfC8KMENBoDcreD2YKFhSYTEPNXxWUqBGmAZj57qezldW-WX/pub?output=csv" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">            
-            <button onclick="loadChampionnatDataFromURL()" style="padding: 0.8em 2em;">
-                Charger le Championnat
-            </button>
-        </div>
-        <div id="championnat-ranking-container" style="margin-bottom: 2em;">
-        </div>
-        
+      <div id="championnat-loader-area">
+        <p id="championnat-status-message">Aucune donnée de championnat chargée.</p>
+
+        <label for="championship-url" style="width:20%;margin-top: 0em;">URL du Google Sheet (publié en HTML) :</label>
+        <input style="width:60%;" type="url" id="championship-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmTg2CpIYfnl02qyU4txWYk89KXV9hpfC8KMENBoDcreD2YKFhSYTEPNXxWUqBGmAZj57qezldW-WX/pub?output=csv" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">            
+        <button onclick="loadChampionnatDataFromURL()" style="width:20%;padding: 0em;">
+          Charger le Championnat
+        </button>
+      </div>
     </div>
 
-    <div id="tab-classement" class="tab-content">
-      <!-- Onglet Classement -->
-      <button onclick="syncJoueursToClassement()">Sync joueurs</button>
-      <button onclick="resetAll()">Reinitialiser Tournoi</button><br/>
-      <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
-      <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
-      <button onclick="assignSeats()">Assigner sièges</button>
-      <div id="classement-container"></div>
-    </div>
+      <div id="tab-classement" class="tab-content">
+        <!-- Onglet Classement -->
+        <button onclick="syncJoueursToClassement()">Sync joueurs</button>
+        <button onclick="resetAll()">Reinitialiser Tournoi</button><br/>
+        <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
+        <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
+        <button onclick="assignSeats()">Assigner sièges</button>
+        <div id="classement-container"></div>
+      </div>
 
-    <div id="tab-points" class="tab-content">
-      <h2 class="title" style="margin-bottom: 1em;">Barème de Points du Championnat</h2>
-      <div id="points-table-container">
+      <div id="tab-points" class="tab-content">
+        <h2 class="title" style="margin-bottom: 1em;">Barème de Points du Championnat</h2>
+        <div id="points-table-container"></div>
+      </div>
+    </div>
+  
+    <!-- Modale générique pour popup (changements d'assignation) -->
+    <div id="popup-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000a; z-index:2000; align-items:center; justify-content:center;">
+      <div id="popup-modal-content" style="background:#333; color:#fff; padding:2em; border-radius:1em; min-width:300px; text-align:center;">
+        <div id="popup-modal-body"></div>
+        <button onclick="closePopup()" style="margin-top:1em;">Fermer</button>
       </div>
     </div>
   </div>
-  <script src="script.js"></script>
-  
-  <!-- Modale générique pour popup (changements d'assignation) -->
-  <div id="popup-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000a; z-index:2000; align-items:center; justify-content:center;">
-    <div id="popup-modal-content" style="background:#333; color:#fff; padding:2em; border-radius:1em; min-width:300px; text-align:center;">
-      <div id="popup-modal-body"></div>
-      <button onclick="closePopup()" style="margin-top:1em;">Fermer</button>
-    </div>
+  <div class="container-R">
+    <div><h2 style="color:#ffb300">Classement Championnat live</h2></div>
+    <div id="championnat-ranking-container" style="margin-bottom: 2em;">
   </div>
 </body>
 </html>
