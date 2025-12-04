@@ -62,7 +62,8 @@
     </div>
 
     <div id="tab-players" class="tab-content">
-      <button onclick="importPlayersCSV()">Import players</button>
+      <input style="width:60%;" type="url" id="players-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmTg2CpIYfnl02qyU4txWYk89KXV9hpfC8KMENBoDcreD2YKFhSYTEPNXxWUqBGmAZj57qezldW-WX/pub" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">
+      <button style="width:20%;" onclick="importPlayersCSV(document.getElementById('players-url').value)">Import players</button>
       <div id="players-table-container"></div>
     </div>
 

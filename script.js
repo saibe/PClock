@@ -1,5 +1,5 @@
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
-const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFOKpdZMMO9sPcpWH6mrQW2S-eaxu-8B6YTZ4ZM93WgbAXuDG8-9nkrO3D644WmxAqHGdm07FGkh7H/pub?gid=137620678&single=true&output=csv';
+const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1jrwdnsvv2XckXTabVCZOrtzBzprDqDNmemQuiyOmGqU/edit?gid=542055167#gid=542055167&single=true&output=csv';
 
 let levels = [];
 let currentLevel = 0;
@@ -88,13 +88,13 @@ function syncJoueursToClassement() {
     nom: j.nom,
     prenom: j.prenom,
     mpla: j.mpla,
-    round: '', 
-    heure: '', 
-    killer: '', 
-    rank: '', 
-    table: '', 
-    seat: '', 
-    actif: false, 
+    round: '',
+    heure: '',
+    killer: '',
+    rank: '',
+    table: '',
+    seat: '',
+    actif: false,
     pts: 0,
   }));
 
@@ -106,21 +106,32 @@ function syncJoueursToClassement() {
   exportAppToJSON();
 }
 
-function importPlayersCSV() {
-  fetch(PLAYERS_CSV_URL)
-    .then(response => response.text())
+function importPlayersCSV(url=PLAYERS_CSV_URL) {
+  fetch(url+'?output=csv')
+    .then(response => { return response.blob(); })
+    .then(blob => {
+        return blob.arrayBuffer();
+    })
+    .then(blob => {
+        // 2. Décoder le Blob en texte en utilisant UTF-8
+        const decoder = new TextDecoder('utf-8');
+        return decoder.decode(blob);
+    })
     .then(csvText => {
+      console.log(csvText);
       const lines = csvText.trim().split('\n');
-      let data = lines.slice(5).map(line => line.split(',').map(v => v.trim()));
+      console.log(lines);
+      let rawData = lines.slice(7).map(line => line.split(',').map(v => v.trim()));
+      let data = rawData.filter(row => row.length > 1 && row[1] !== '');
+      console.log(data);
       let html = '<table id="players-table"><thead><tr>';
-      html += '<th>Nom</th><th>Prénom</th><th>MPLA</th><th>Winamax</th></tr></thead><tbody>';
+      html += '<th>Prénom</th><th>MPLA</th><th>Winamax</th></tr></thead><tbody>';
       data.forEach(row => {
         if (row.length >= 7) {
           html += `<tr>
-            <td>${row[0]}</td>
-            <td>${row[1]}</td>
-            <td>${row[5]}</td>
-            <td>${row[6]}</td>
+            <td>${row[0] || ''}</td>
+            <td>${row[1] || ''}</td>
+            <td>${row[2] || ''}</td>
           </tr>`;
         }
       });
@@ -128,7 +139,7 @@ function importPlayersCSV() {
       document.getElementById('players-table-container').innerHTML = html;
       // Stocke la liste brute pour la synchronisation
       window.joueursImportes = data.map(row => ({
-        nom: row[0], prenom: row[1], mpla: row[5], winamax: row[6]
+        prenom: row[0] || '', mpla: row[1] || '', winamax: row[2] || ''
       }));
     });
 }
@@ -489,10 +500,10 @@ function resetAll() {
 
   // 5. Rafraîchit l’affichage
   updateDisplay();
-  importPlayersCSV();
   renderClassement();
   renderTablesPlan();
   exportAppToJSON();
+  updatePlayerStatusDisplay();
 }// Génère le tableau de structure complète
 
 function showTab(tab) {
@@ -624,13 +635,13 @@ function renderClassementSimplifie() {
 
     // 2. Trier par rang final (du plus petit au plus grand, ex: 1er, 2e, 3e...)
     rankedPlayers.sort((a, b) => {
-        
+
         const rankA = a.rank === '' || a.rank === null ? 0 : parseInt(a.rank);
         const rankB = b.rank === '' || b.rank === null ? 0 : parseInt(b.rank);
 
         // Si rankA ou rankB est 0 (signifiant '' ou null), ils seront considérés comme les plus petits
         // (donc premiers dans l'ordre croissant).
-        
+
         // Si les deux sont en jeu (rankA == 0 et rankB == 0),
         // vous pouvez ajouter ici un critère de tri secondaire (ex: par points ou par nom).
         if (rankA === 0 && rankB === 0) {
@@ -638,20 +649,20 @@ function renderClassementSimplifie() {
             // Ici, on trie par nom (alphabétique) :
             return a.mpla.localeCompare(b.mpla);
         }
-        
+
         return rankA - rankB; // Tri ascendant normal (1, 2, 3...)
-    });    
+    });
 
     let htmlContent = '';
-    
+
     const container = document.getElementById('simple-ranking-container');
     if (!container) return; // Sécurité
-    
+
     if (rankedPlayers.length === 0) {
         container.innerHTML = 'Aucune élimination enregistrée.';
         return;
     }
-    
+
     // Démarrer la structure du tableau
     htmlContent = '<table class="simple-ranking-table"><tbody>';
 
@@ -690,6 +701,7 @@ function renderClassementSimplifie() {
     htmlContent += '</tbody></table>';
     container.innerHTML = htmlContent;
     exportAppToJSON();
+    updatePlayerStatusDisplay();
 }
 
 function renderClassement() {
@@ -766,7 +778,7 @@ function renderClassement() {
       // 1. Bouton Action : Afficher OUT uniquement si le joueur n'est pas éliminé
       actionContent = !isElimine 
           ? `<button class="in-btn" onclick="toggleOutClassement('${p.mpla}')">IN</button>` 
-          : `<button class="out-btn">OUT</button>` ; // Vide si le joueur est éliminé (OUT)
+          : `<button class="out-btn" onclick="toggleOutClassement('${p.mpla}')">OUT</button>` ; // Vide si le joueur est éliminé (OUT)
 
       // 2. Colonne Killer : Liste déroulante des joueurs encore IN
       let killerContent = p.killer || '';
@@ -825,6 +837,8 @@ function renderClassement() {
   document.getElementById('classement-container').innerHTML = html;
   
   exportAppToJSON();
+  renderClassementSimplifie();
+  renderChampionnatRanking();
 }
 
 function toggleActif(mpla) {
@@ -884,7 +898,6 @@ function toggleOutClassement(mpla) {
 
         // 3. Attribution des points au joueur 
         classementData[index].pts = DEFAULT_POINTS_BAREME.find(item => item.rank === classementData[index].rank).points;
-        // 3. Attribution des points au joueur 
         joueurRestantPts = DEFAULT_POINTS_BAREME.find(item => item.rank === (classementData[index].rank - 1)).points;
         console.log("Points joueurs suivants: "+joueurRestantPts);
         classementData.forEach(p => {
@@ -903,11 +916,20 @@ function toggleOutClassement(mpla) {
         // ===================================
 
         // 1. Vider les données d'élimination
-        classementData[index].rank = null;
+        classementData[index].rank = '';
         classementData[index].pts = 0;
         classementData[index].heure = '';
         classementData[index].round = '';
         classementData[index].killer = ''; 
+
+        nbJoueursRestant = classementData.filter(p => p.actif && (p.rank === null || p.rank === '' | p.rank === 0)).length;
+        joueurRestantPts = DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points;
+        console.log("====joueurs restants: "+nbJoueursRestant+" ======>Points joueurs suivants: "+joueurRestantPts);
+        classementData.forEach(p => {
+          if (p.actif && (p.rank === null || p.rank === '')) {
+            p.pts = joueurRestantPts;
+          }
+        });
         
         // 2. Le joueur redevient actif (si ce n'est pas déjà le cas)
         classementData[index].actif = true;
@@ -952,6 +974,7 @@ function toggleOutClassement(mpla) {
     // 6. Mettre à jour l'affichage
     renderClassementSimplifie();
     renderClassement();
+    renderChampionnatRanking();
     renderTablesPlan();
     updateDisplay();
     exportAppToJSON();
@@ -1593,14 +1616,15 @@ function renderChampionnatRanking() {
         if (isNaN(pointA)) return 1;
         if (isNaN(pointB)) return -1;
 
-        addPtsA = classementData.find(item => item.mpla === a.mpla).pts;
-        addPtsA = addPtsA ? addPtsA : 0;
-        addPtsB = classementData.find(item => item.mpla === b.mpla).pts;
-        addPtsB = addPtsB ? addPtsB : 0;
+        joueurA = classementData.find(item => item.mpla === a.mpla);
+        addPtsA = joueurA ? (joueurA.pts || 0) : 0;
+        joueurB = classementData.find(item => item.mpla === b.mpla);
+        addPtsB = joueurB ? (joueurB.pts || 0) : 0;
 
         return (pointB+addPtsB) - (pointA+addPtsA);
     });
     
+    // reecrit le rank de joueurs prit dans l'ordre
     let newrank = 1;
     championshipData.forEach(p => {
       p.rank = newrank;
@@ -1616,9 +1640,7 @@ function renderChampionnatRanking() {
     // DÉFINITION DE L'ORDRE ET DES LABELS AFFICHÉS
     const columnsToDisplay = [
         { key: 'rank', label: 'Rang' },
-//        { key: 'prenom', label: 'Prénom' },
         { key: 'mpla', label: 'Pseudo MPLA' },
-//        { key: 'winamax', label: 'Pseudo Winamax' },
         { key: 'points', label: 'Points' },
         { key: 'pts', label: '' }
     ];
@@ -1646,9 +1668,10 @@ function renderChampionnatRanking() {
         if (rank > 0 && rank <= top33Count) {
           rowClass = (rank % 2 == 0) ? 'top-33-percent-even': 'top-33-percent';
         }
-        addPts = classementData.find(item => item.mpla === p.mpla).pts;
+        joueur = classementData.find(item => item.mpla === p.mpla);
+        addPts = joueur ? joueur.pts || 0 : 0;
         console.log(addPts);
-        isRank = classementData.find(item => item.mpla === p.mpla).rank;
+        isRank = joueur ? joueur.rank || 0 : 0;
         if (addPts>0){
           rowClass += (isRank > 0) ? " ranking-virtual-out" : " ranking-virtual-in";
         }
