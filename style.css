@@ -9,41 +9,36 @@ body {
   height: 100%;
   margin: 0;
 }
-/* container secondaire droit*/
-.container-R {
+.container-L, .container, .container-R {
   background: #333;
   padding: 0em 1em;
   border-radius: 16px;
   box-shadow: 0 0 24px #000a;
+  max-height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+/*
+  margin-top: 0;
+*/
+}
+
+/* container secondaire droit*/
+.container-R {
   text-align: right;
   min-width: 350px;
   width:25%;
-  height: 100%;
-  margin-top: 0;
-}
-/* container secondaire droit*/
-.container-L {
-  background: #333;
-  padding: 0em 1em;
-  border-radius: 16px;
-  box-shadow: 0 0 24px #000a;
-  text-align: left;
-  min-width: 350px;
-  width:25%;
-  height: 100%;
-  margin-top: 0;
 }
 /* container principal centre*/
 .container {
-  background: #333;
-  padding: 0em 0em;
-  border-radius: 16px;
-  box-shadow: 0 0 24px #000a;
   text-align: center;
   min-width: 350px;
   width:100%;
-  height: 100%;
-  margin-top: 0;
+}
+/* container secondaire droit*/
+.container-L {
+  text-align: left;
+  min-width: 350px;
+  width:25%;
 }
 .title {
   background-color: chocolate;
