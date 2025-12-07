@@ -1,13 +1,15 @@
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
 const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1jrwdnsvv2XckXTabVCZOrtzBzprDqDNmemQuiyOmGqU/edit?gid=542055167#gid=542055167&single=true&output=csv';
 
+
+
 let levels = [];
 let currentLevel = 0;
 let timeLeft = 0;
 let timerInterval = null;
 let running = false;
 let dateOfTheDay= new Date();
-let structureTitle = 'ASL POKER 72 - S14T1 - ' + dateOfTheDay.getDate() + '/' + (dateOfTheDay.getMonth()+1);
+let structureTitle = 'ASL POKER 72 - S14T2 - ' + dateOfTheDay.getDate() + '/' + (dateOfTheDay.getMonth()+1);
 let selectedPlayersIndexes = [];
 let playerAssignments = []; // [{index, table, seat}]
 let classementData = [];
@@ -118,12 +120,9 @@ function importPlayersCSV(url=PLAYERS_CSV_URL) {
         return decoder.decode(blob);
     })
     .then(csvText => {
-      console.log(csvText);
       const lines = csvText.trim().split('\n');
-      console.log(lines);
       let rawData = lines.slice(7).map(line => line.split(',').map(v => v.trim()));
       let data = rawData.filter(row => row.length > 1 && row[1] !== '');
-      console.log(data);
       let html = '<table id="players-table"><thead><tr>';
       html += '<th>Prénom</th><th>MPLA</th><th>Winamax</th></tr></thead><tbody>';
       data.forEach(row => {
@@ -520,7 +519,7 @@ function showTab(tab) {
   if (tab === 'tables') {
     renderTablesPlan();
   }
-  if (tab === 'classement') {
+  if (tab === 'tournoi') {
     renderClassement();
   }
   if (tab === 'championnat') { 
@@ -667,10 +666,12 @@ function renderClassementSimplifie() {
     htmlContent = '<table class="simple-ranking-table"><tbody>';
 
     // 3. Générer les lignes du tableau (Rang | Nom | Bouton OUT)
-    rankedPlayers.forEach(p => {
-        const buttonText = p.rank ?  DEFAULT_POINTS_BAREME.find(item => item.rank === p.rank).points+'pts' : 'X'; 
+    rankedPlayers.forEach((p, index) => {
+        const ptsLadder = DEFAULT_POINTS_BAREME[index].points+'pts';
+        const buttonText = p.rank ?  ptsLadder : 'X'; 
         const buttonClass = p.rank ? '' : 'out-btn';
         const rankText = p.rank ? p.rank : '';
+        const ladder = p.rank ? '' : ptsLadder;
         
         // Nous allons ajouter un bouton pour POUVOIR annuler l'élimination ou modifier le statut.
         // Si le joueur est classé (rankedPlayers), le bouton est inutile, car il est déjà OUT.
@@ -693,6 +694,9 @@ function renderClassementSimplifie() {
                         title="Eliminer ${p.mpla}"
                         onclick="toggleOutClassement('${p.mpla}')"> ${buttonText}
                     </button>
+                </td>
+                <td class="pts-ladder">
+                    ${ladder}
                 </td>
             </tr>
         `;
@@ -899,7 +903,6 @@ function toggleOutClassement(mpla) {
         // 3. Attribution des points au joueur 
         classementData[index].pts = DEFAULT_POINTS_BAREME.find(item => item.rank === classementData[index].rank).points;
         joueurRestantPts = DEFAULT_POINTS_BAREME.find(item => item.rank === (classementData[index].rank - 1)).points;
-        console.log("Points joueurs suivants: "+joueurRestantPts);
         classementData.forEach(p => {
           if (p.actif && (p.rank === null || p.rank === '')) {
             p.pts = joueurRestantPts;
@@ -924,7 +927,6 @@ function toggleOutClassement(mpla) {
 
         nbJoueursRestant = classementData.filter(p => p.actif && (p.rank === null || p.rank === '' | p.rank === 0)).length;
         joueurRestantPts = DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points;
-        console.log("====joueurs restants: "+nbJoueursRestant+" ======>Points joueurs suivants: "+joueurRestantPts);
         classementData.forEach(p => {
           if (p.actif && (p.rank === null || p.rank === '')) {
             p.pts = joueurRestantPts;
@@ -998,8 +1000,11 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
     oldByTable[a.table].push(a);
   });
 
+  console.log(oldByTable);
+
   // 1. Si le nombre de tables diminue, on ferme la table la moins remplie
   let oldTables = Array.from(new Set(oldAssignments.map(a => a.table))).filter(t => !isNaN(Number(t)));
+  console.log(oldTables);
   let tablesCassees = [];
   let joueursToReassign = [];
   if (oldTables.length > nbTables) {
@@ -1153,28 +1158,22 @@ function syncSelectedPlayersIndexes() {
 
 function assignSeats() {
   // Prend uniquement les joueurs actif
-      console.log(classementData);
   classementData.forEach(j => {
-    if (j.actif && j.rank > 0) {
-      console.log("Joueur: "+j.mpla+" (table:"+j.table+", siege:"+j.seat+")");
+    if (j.actif && parseInt(j.rank) > 0) {
       j.table = '';
       j.seat = '';
-      console.log("==> Joueur: "+j.mpla+" (table:"+j.table+", siege:"+j.seat+")");
     }
   });
-      console.log(classementData);
   const joueurs = classementData.filter(p => p.actif && (p.rank == '' || p.rank == null)).map(p => ({ mpla: p.mpla }));
-  console.log("++JOUEURS:");
-  console.log(joueurs);
   if (joueurs.length === 0) {
     alert("Aucun joueur en jeu !");
     return;
   }
-  console.log("JOUEURS:");
-  console.log(joueurs);
 
+  console.log(joueurs);
   // Nombre de joueurs max par table
   const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+  console.log('perTables:'+perTable);
 
   // Construit oldAssignments à partir de classementData pour les joueurs payés
   const oldAssignments = joueurs.map(j => {
@@ -1183,19 +1182,22 @@ function assignSeats() {
       ? { mpla: p.mpla, table: parseInt(p.table), seat: parseInt(p.seat) }
       : { mpla: j.mpla, table: '', seat: ''};
   });
+  const validOldAssignments = oldAssignments.filter(a => a.table !== ''); // AJOUTEZ CECI
 
+  console.log(oldAssignments);
+  console.log(validOldAssignments);
   // Appel à la fonction d'équilibrage stricte
-console.log("==>oldAssignments");
-console.log(oldAssignments);
-  const { assignments, changes, tablesCassees } = equilibrerTables(joueurs, perTable, oldAssignments);
-console.log(assignments);
+  const { assignments, changes, tablesCassees } = equilibrerTables(joueurs, perTable, validOldAssignments);
+  console.log(assignments);
 
+  nbJoueursRestant = classementData.filter(p => p.actif && (p.rank === null || p.rank === '' | p.rank === 0)).length;
   // Mets à jour classementData pour TOUS les joueurs payés
   assignments.forEach(a => {
     let p = classementData.find(p => p.mpla === a.mpla);
     if (p) {
       p.table = a.table;
       p.seat = a.seat;
+      p.pts = DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points;
     } else {
       classementData.push({
         mpla: a.mpla,
@@ -1206,7 +1208,7 @@ console.log(assignments);
         table: a.table,
         seat: a.seat,
         actif: true,
-        pts: 0,
+        pts: DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points,
       });
     }
   });
@@ -1218,7 +1220,9 @@ console.log(assignments);
     seat: a.seat
   }));
 
+  renderChampionnatRanking();
   renderClassement();
+  renderClassementSimplifie();
   renderTablesPlan();
   exportAppToJSON();
 }
@@ -1291,7 +1295,7 @@ function renderTablesPlan() {
   // Génère le HTML
   let html = '<div class="tables-flex">';
   Object.keys(tables).sort((a, b) => a - b).forEach(tableNum => {
-    html += `<div class="table-block" style="margin:1em;display:inline-block;">
+    html += `<div class="table-block">
       <strong style="color:#ffb300; font-size:1.3em;">Table ${tableNum}</strong>
       <table style="margin:auto; background:#222; color:#fff; border-radius:8px; min-width:200px;">
         <tbody>`;
@@ -1320,14 +1324,16 @@ function restoreAppFromLocalStorage() {
   if (!appStateJSON) return;
   try {
     const appState = JSON.parse(appStateJSON);
+/*
     console.log("restoring ... pokerAppData file");
     console.log(appState);
-
+*/
     // Structure
     if (appState.levels) levels = appState.levels;
+/*
     console.log("restoring levels ...");
     console.log(levels);
-
+*/
     // Horloge
     if (appState.horloge) {
       stopTimer();
@@ -1337,36 +1343,45 @@ function restoreAppFromLocalStorage() {
       running = !!appState.horloge.running;
       applyFontSizes();
     }
+/*
     console.log("restoring horloge ...");
     console.log(currentLevel);
     console.log(timeLeft);
     console.log(baseFontSize);
     console.log(running);
-
+*/
     // Joueurs
     selectedPlayersIndexes = appState.selectedPlayersIndexes || [];
     playerAssignments = appState.playerAssignments || [];
-    
+/*    
     console.log("restoring playerAssignments ...");
     console.log(playerAssignments);
-
+*/
     // ClassementData
+/*
     console.log("restoring classementData ...");
     console.log(appState.classementData);
+*/
     if (appState.classementData) classementData = appState.classementData;
+/*
     console.log(classementData);
-
+*/
     // Titre
     if (appState.structureTitle) {
       const titleElem = document.getElementById('structure-title');
       if (titleElem) titleElem.textContent = appState.structureTitle;
       structureTitle = appState.structureTitle;
     }
+/*
     console.log("restoring structureTitle ...");
     console.log(structureTitle);
-
+*/
     if (appState.championshipData) {
         championshipData = appState.championshipData;
+    }
+
+    if (appState.startingStack) {
+        startingStack = appState.startingStack;
     }
 
     // Recharge l’affichage
@@ -1398,7 +1413,8 @@ function exportAppToJSON() {
         currentRank: currentRank, 
         joueurAEliminerMPLA: joueurAEliminerMPLA,
         selectedPlayersIndexes: selectedPlayersIndexes,
-        championshipData: championshipData
+        championshipData: championshipData,
+        startingStack: startingStack
     };
     const jsonString = JSON.stringify(appData);
     
@@ -1409,7 +1425,7 @@ function exportAppToJSON() {
     // ajoutez ici le code de téléchargement de fichier que vous aviez. Sinon, il n'est plus nécessaire.
     console.log("Données sauvegardées automatiquement dans localStorage.");
     console.log(appData);
-    console.log(jsonString);
+//    console.log(jsonString);
 }
 
 function updateClassementCell(mpla, field, value) {
@@ -1420,6 +1436,19 @@ function updateClassementCell(mpla, field, value) {
   }
 }
 
+function updateStartingStackValue() {
+    const startingStackElement = document.getElementById('starting-stack');
+    
+    // 1. Mise à jour de la variable globale (si nécessaire, bien que nous lisions directement ci-dessous)
+    if (startingStackElement) {
+        // Mettre à jour la variable globale avec la nouvelle valeur
+        startingStack = parseInt(startingStackElement.value) || 20000; 
+    }
+    // 2. Appel des fonctions de rendu/calcul impactées
+//    updateAverageStack();
+    updatePlayerStatusDisplay(); // Mise à jour de l'affichage des joueurs et des stats
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   
   // =========================================================
@@ -1428,8 +1457,16 @@ document.addEventListener('DOMContentLoaded', function() {
   // Tente de charger l'état depuis localStorage
   restoreAppFromLocalStorage();
     
-  console.log(classementData);
+  // S'assurer que le script ne tente de lier l'écouteur que si l'élément existe
+  const startingStackInput = document.getElementById('starting-stack');
   
+  if (startingStackInput) {
+    startingStackInput.value = startingStack;
+    // 'input' se déclenche immédiatement à chaque frappe de touche, 
+    // 'change' se déclenche lorsque le champ perd le focus. 'input' est souvent préférable.
+    startingStackInput.addEventListener('input', updateStartingStackValue);
+  }
+
   updateDisplay();
   renderClassement(); 
   renderTablesPlan();
@@ -1488,208 +1525,53 @@ document.addEventListener('keydown', function(e) {
 });
 
 function parseCSV_champ(csvText) {
-const lines = csvText.split('\n').filter(line => line.trim() !== '');
-    if (lines.length < 2) return []; // Moins de 2 lignes = pas de données
-    
-    // CARTE DE CORRESPONDANCE : CSV Header -> Clé JS
-    const keyMapping = {
-        'prenom': 'Prénom', 
-        'mpla': 'Pseudo MPLA', 
-        'winamax': 'Pseudo Winamax', 
-        'rank': 'Rank', 
-        'points': 'Nombre points' 
-    };
+  const lines = csvText.split('\n').filter(line => line.trim() !== '');
+  if (lines.length < 2) return []; // Moins de 2 lignes = pas de données
 
-    // Trouver les indices des colonnes requises dans le CSV original
-    const columnIndices = {};
-    columnIndices['prenom'] = 0;
-    columnIndices['mpla'] = 1;
-    columnIndices['winamax'] = 2;
-    columnIndices['rank'] = 3;
-    columnIndices['points'] = 4;
-    
-    const data = [];
+  // CARTE DE CORRESPONDANCE : CSV Header -> Clé JS
+  const keyMapping = {
+      'prenom': 'Prénom', 
+      'mpla': 'Pseudo MPLA', 
+      'winamax': 'Pseudo Winamax', 
+      'rank': 'Rank', 
+      'points': 'Nombre points' 
+  };
 
-    // Traitement des lignes de données (à partir de la 4ème ligne)
-    for (let i = 7; i < lines.length; i++) {
-        const currentLine = lines[i];
-        const values = currentLine.split(',');
-        
-        console.log(values);
+  // Trouver les indices des colonnes requises dans le CSV original
+  const columnIndices = {};
+  columnIndices['prenom'] = 0;
+  columnIndices['mpla'] = 1;
+  columnIndices['winamax'] = 2;
+  columnIndices['rank'] = 3;
+  columnIndices['points'] = 4;
+  
+  const data = [];
 
-        const player = {};
-        
-        // Extraction et standardisation des colonnes
-        Object.keys(columnIndices).forEach(standardKey => {
-            const index = columnIndices[standardKey];
-            // Nettoyage de la valeur (trim et suppression des guillemets)
-            player[standardKey] = values[index].trim().replace(/"/g, ''); 
-        });
-        
-        // Filtrer les lignes vides
-        if (Object.values(player).some(val => val !== '')) {
-            data.push(player);
-        }
-    }
-    
-    return data;
+  console.log("====> Premiere ligne:" +lines[0]);
+  structureTitle = lines[0].split(',')[0].trim().replace(/Championnat/g,'');
+  console.log("Title:"+structureTitle);
+
+  // Traitement des lignes de données (à partir de la 4ème ligne)
+  for (let i = 7; i < lines.length; i++) {
+      const currentLine = lines[i];
+      const values = currentLine.split(',');
+      
+      console.log(values);
+
+      const player = {};
+      
+      // Extraction et standardisation des colonnes
+      Object.keys(columnIndices).forEach(standardKey => {
+          const index = columnIndices[standardKey];
+          // Nettoyage de la valeur (trim et suppression des guillemets)
+          player[standardKey] = values[index].trim().replace(/"/g, ''); 
+      });
+      
+      // Filtrer les lignes vides
+      if (Object.values(player).some(val => val !== '')) {
+          data.push(player);
+      }
   }
-
-// -------------------------------------------------------------------------
-// FONCTIONS DE GESTION DU CHAMPIONNAT (FORMAT CSV)
-// -------------------------------------------------------------------------
-async function loadChampionnatDataFromURL() {
-    const urlInput = document.getElementById('championship-url');
-    const statusMessage = document.getElementById('championnat-status-message');
-    const url = urlInput.value.trim();
-
-    if (!url || !url.includes('output=csv')) {
-        statusMessage.textContent = 'Veuillez entrer une URL valide au format CSV (doit contenir "output=csv").';
-        return;
-    }
-
-    statusMessage.textContent = 'Chargement des données CSV en cours...';
-
-    try {
-        // Récupération du texte brut CSV
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Erreur de chargement de l\'URL CSV.');
-        
-        const csvText = await response.text();
-        
-        // Analyse du texte CSV
-        championshipData = parseCSV_champ(csvText); 
-        
-        if (championshipData.length === 0) {
-            throw new Error('Aucune donnée de classement trouvée dans le fichier CSV.');
-        }
-
-        // Sauvegarde réussie
-        exportAppToJSON();
-        statusMessage.textContent = `Championnat chargé avec succès (${championshipData.length} lignes).`;
-        renderChampionnatRanking();
-
-    } catch (e) {
-        statusMessage.textContent = `Erreur de chargement: ${e.message}.`;
-        console.error("Erreur de chargement du Championnat:", e);
-    }
-}
-
-// Fonction placeholder pour l'analyse (à adapter)
-function extractDataFromTable(tbody) {
-    const data = [];
-    // Logique pour itérer sur les <tr> et <td> du tbody
-    tbody.querySelectorAll('tr').forEach((row, index) => {
-        if (index === 0) return; // Sauter la ligne d'en-tête (si elle est là)
-        const cells = row.querySelectorAll('td');
-        if (cells.length > 1) {
-            data.push({
-                rank: cells[3]?.textContent.trim() || '',
-                name: cells[1]?.textContent.trim() || '',
-                points: cells[4]?.textContent.trim() || ''
-                // Ajoutez toutes les colonnes nécessaires
-            });
-        }
-    });
-    return data;
-}
-
-function renderChampionnatRanking() {
-    const container = document.getElementById('championnat-ranking-container');
-    const statusMessage = document.getElementById('championnat-status-message');
-    
-    if (!container) return;
-
-    if (!championshipData || championshipData.length === 0) {
-        container.innerHTML = '<p>Aucun classement de championnat à afficher.</p>';
-        statusMessage.textContent = 'Aucune donnée de championnat chargée.';
-        return;
-    }
-    
-    // Ceci est crucial pour que la mise en évidence du top 33% s'applique correctement
-    championshipData.sort((a, b) => {
-        // Convertir la chaîne de caractères 'rank' en nombre pour un tri numérique
-        const pointA = parseInt(a.points, 10);
-        const pointB = parseInt(b.points, 10);
-        
-        // Gérer les cas où le rang n'est pas un nombre (pour les mettre à la fin, par exemple)
-        if (isNaN(pointA)) return 1;
-        if (isNaN(pointB)) return -1;
-
-        joueurA = classementData.find(item => item.mpla === a.mpla);
-        addPtsA = joueurA ? (joueurA.pts || 0) : 0;
-        joueurB = classementData.find(item => item.mpla === b.mpla);
-        addPtsB = joueurB ? (joueurB.pts || 0) : 0;
-
-        return (pointB+addPtsB) - (pointA+addPtsA);
-    });
-    
-    // reecrit le rank de joueurs prit dans l'ordre
-    let newrank = 1;
-    championshipData.forEach(p => {
-      p.rank = newrank;
-      newrank = newrank +1;
-    });
-    
-    // CALCUL DU SEUIL DES 33%
-    const totalPlayers = championshipData.length;
-    // Math.ceil assure que même si 33% donne un nombre décimal, on inclut le joueur correspondant (arrondi au supérieur)
-    const top33Count = Math.ceil(totalPlayers * 0.33); 
-    
-
-    // DÉFINITION DE L'ORDRE ET DES LABELS AFFICHÉS
-    const columnsToDisplay = [
-        { key: 'rank', label: 'Rang' },
-        { key: 'mpla', label: 'Pseudo MPLA' },
-        { key: 'points', label: 'Points' },
-        { key: 'pts', label: '' }
-    ];
-
-    statusMessage.textContent = `Affichage du classement (${championshipData.length} joueurs). Les ${top33Count} premiers sont mis en évidence.`;
-    statusMessage.style.display = 'none';
-
-    // Rendu du tableau
-    let html = '<table class="simple-ranking-table">';
-    
-    // Ligne d'en-têtes
-    html += '<thead><tr>';
-    columnsToDisplay.forEach(col => {
-        html += `<th>${col.label}</th>`; 
-    });
-    html += '</tr></thead><tbody>';
-    
-    // Lignes de données
-    championshipData.forEach(p => {
-        // Le rang est maintenant lu après le tri, garantissant la bonne position
-        const rank = parseInt(p.rank); 
-        
-        // Ajout de la classe si le joueur fait partie du top 33%
-        let rowClass = '';
-        if (rank > 0 && rank <= top33Count) {
-          rowClass = (rank % 2 == 0) ? 'top-33-percent-even': 'top-33-percent';
-        }
-        joueur = classementData.find(item => item.mpla === p.mpla);
-        addPts = joueur ? joueur.pts || 0 : 0;
-        console.log(addPts);
-        isRank = joueur ? joueur.rank || 0 : 0;
-        if (addPts>0){
-          rowClass += (isRank > 0) ? " ranking-virtual-out" : " ranking-virtual-in";
-        }
-
-        html += `<tr class="${rowClass}">`;
-        columnsToDisplay.forEach(col => {
-          if(col.key === "pts") {
-            field=addPts ? '+'+addPts : '';
-            html += `<td>${field}</td>`; 
-          } else if(col.key === "mpla") {
-            html += `<td style="text-align:center">${p[col.key] || ''}</td>`; 
-          } else {
-            html += `<td>${p[col.key] || ''}</td>`; 
-          }
-        });
-        html += '</tr>';
-    });
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
+  
+  return data;
 }

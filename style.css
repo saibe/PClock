@@ -17,9 +17,6 @@ body {
   max-height: 100vh;
   overflow-y: auto;
   box-sizing: border-box;
-/*
-  margin-top: 0;
-*/
 }
 
 /* container secondaire droit*/
@@ -27,6 +24,9 @@ body {
   text-align: right;
   min-width: 350px;
   width:25%;
+  box-sizing: border-box;
+  background:#111;
+  padding: 1em;
 }
 /* container principal centre*/
 .container {
@@ -39,6 +39,9 @@ body {
   text-align: left;
   min-width: 350px;
   width:25%;
+  box-sizing: border-box;
+  background:#111;
+  padding: 1em;
 }
 .title {
   background-color: chocolate;
@@ -297,10 +300,10 @@ body {
   background: #222;
   border-radius: 1.5em;
   box-shadow: 0 0 16px #000a;
-  padding: 2em 2em 2.5em 2em;
-  min-width: 220px;
-  max-width: 320px;
-  margin-bottom: 2em;
+  padding: 1em;
+  min-width: 25%;
+  max-width: 45%;
+  width:20%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -332,7 +335,7 @@ body {
 #popup-modal {
   display: none;
   position: fixed;
-  top: 0; left: 0; width: 80%; height: 100vh;
+  top: 0; left: 0; width: 100%; height: 100vh;
   background: #000a;
   z-index: 2000;
   align-items: center;
@@ -349,6 +352,7 @@ body {
   text-align: center;
   box-sizing: border-box;
   font-size: 2em;    /* font-size à 2em */
+  width:60%;
 }
 /* Style pour la ligne d'un joueur éliminé */
 .out-row {
@@ -528,9 +532,16 @@ body {
     text-overflow: ellipsis; /* Ajoute des "..." si le nom est coupé */
 }
 
-simple-ranking-table .btn-cell {
+.simple-ranking-table .btn-cell {
     width: 20%; /* Pour donner de la place au bouton */
     text-align: right;
+    /* padding-left: 0.5em; */
+}
+
+.simple-ranking-table .pts-ladder {
+    width: 20%; /* Pour donner de la place au bouton */
+    text-align: right;
+    color: #888!important;
     /* padding-left: 0.5em; */
 }
 

@@ -5,6 +5,7 @@
   <title>Poker Clock</title>
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
+  <script src="championship.js" defer></script>
 </head>
 <body>
   <div class="container-L">
@@ -26,8 +27,8 @@
     </div>
     <div class="tabs">
         <div class="tab-buttons-group"> 
-          <button class="tab-btn active" onclick="showTab('tournoi')">Tournoi</button>
-          <button class="tab-btn" onclick="showTab('classement')">Classement</button>
+          <button class="tab-btn active" onclick="showTab('clock')">Clock</button>
+          <button class="tab-btn" onclick="showTab('tournoi')">Tournoi</button>
           <button class="tab-btn" onclick="showTab('tables')">Tables</button>
           <button class="tab-btn" onclick="showTab('structure')">Structure</button>
           <button class="tab-btn" onclick="showTab('players')">Joueurs</button>
@@ -36,7 +37,7 @@
         </div>        
     </div>
 
-    <div id="tab-tournoi" class="tab-content active">
+    <div id="tab-clock" class="tab-content active">
   
       <h3 id="level">Niveau 1</h3>
       <div id="timer">--:--</div>
@@ -62,7 +63,7 @@
     </div>
 
     <div id="tab-players" class="tab-content">
-      <input style="width:60%;" type="url" id="players-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmTg2CpIYfnl02qyU4txWYk89KXV9hpfC8KMENBoDcreD2YKFhSYTEPNXxWUqBGmAZj57qezldW-WX/pub" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">
+      <input style="width:60%;" type="url" id="players-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR5dovbFD3uwJ5_cHcOfDrHQrNfwJxs0w9LT7R_0Bml2Euw7cFT-mS5rC4821yjcM2hw-C5ykypXC8C/pub" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">
       <button style="width:20%;" onclick="importPlayersCSV(document.getElementById('players-url').value)">Import players</button>
       <div id="players-table-container"></div>
     </div>
@@ -72,20 +73,26 @@
         <p id="championnat-status-message">Aucune donnée de championnat chargée.</p>
 
         <label for="championship-url" style="width:20%;margin-top: 0em;">URL du Google Sheet (publié en HTML) :</label>
-        <input style="width:60%;" type="url" id="championship-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmTg2CpIYfnl02qyU4txWYk89KXV9hpfC8KMENBoDcreD2YKFhSYTEPNXxWUqBGmAZj57qezldW-WX/pub?output=csv" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">            
-        <button onclick="loadChampionnatDataFromURL()" style="width:20%;padding: 0em;">
+        <input style="width:60%;" type="url" id="championship-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR5dovbFD3uwJ5_cHcOfDrHQrNfwJxs0w9LT7R_0Bml2Euw7cFT-mS5rC4821yjcM2hw-C5ykypXC8C/pub" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">            
+        <button onclick="loadChampionnatDataFromURL(document.getElementById('players-url').value)" style="width:20%;padding: 0em;">
           Charger le Championnat
         </button>
       </div>
+      <div id="championnat-full-container"></div>
     </div>
 
-      <div id="tab-classement" class="tab-content">
-        <!-- Onglet Classement -->
+      <div id="tab-tournoi" class="tab-content">
         <button onclick="syncJoueursToClassement()">Sync joueurs</button>
-        <button onclick="resetAll()">Reinitialiser Tournoi</button><br/>
-        <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
-        <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
-        <button onclick="assignSeats()">Assigner sièges</button>
+        <button onclick="resetAll()">Reinitialiser Tournoi</button>
+        <div>
+          <label for="starting-stack" style="font-size:1.1em;">Stack de départ :</label>
+          <input type="number" id="starting-stack" value="10000" style="width:8em; text-align:right; font-size:1.1em;">
+        </div>
+        <div>
+          <label for="players-per-table" style="font-size:1.1em;">Joueurs par table :</label>
+          <input type="number" id="players-per-table" min="2" max="10" value="8" style="width:3em; font-size:1.1em;">
+          <button onclick="assignSeats()">Assigner sièges</button>
+        </div>
         <div id="classement-container"></div>
       </div>
 
@@ -104,7 +111,7 @@
     </div>
   </div>
   <div class="container-R">
-    <div><h2 style="color:#ffb300">Classement Championnat live</h2></div>
+    <div><h2 style="color:#ffb300">Championnat <span style="border-radius:5px;padding:2px 4px;color:white;background:red;">&bull; live</span></h2></div>
     <div id="championnat-ranking-container" style="margin-bottom: 2em;">
   </div>
 </body>
