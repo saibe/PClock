@@ -1,0 +1,616 @@
+body {
+  background: #222;
+  color: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width:100%;
+  height: 100%;
+  margin: 0;
+}
+.container-L, .container, .container-R {
+  background: #333;
+/*  padding: 0em 1em; */
+  border-radius: 16px;
+  box-shadow: 0 0 24px #000a;
+  max-height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* container secondaire droit*/
+.container-R {
+  text-align: center;
+  min-width: 350px;
+  width:25%;
+  box-sizing: border-box;
+  background:#111;
+  padding: 1em;
+}
+/* container principal centre*/
+.container {
+  text-align: center;
+  min-width: 350px;
+  width:100%;
+}
+/* container secondaire droit*/
+.container-L {
+  text-align: left;
+  min-width: 350px;
+  width:25%;
+  box-sizing: border-box;
+  background:#111;
+  padding: 1em;
+}
+.title {
+  background-color: chocolate;
+  text-align: center;
+  padding: 0.5em 0;
+  font-size: xx-large;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+  border-bottom-left-radius: 0px;
+}
+.tab-buttons-group {
+    display: flex;
+    gap: 0.5em; /* Espace entre chaque bouton */
+}
+.datetime {
+  font-size: 1.5em;
+  color: #ffb300;
+  margin-bottom: 1em;
+  border-bottom: 1px solid #555;
+}
+.tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 3em;
+  gap: 0.5em;
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
+.tab-btn {
+  background: #444;
+  color: #fff;
+  border: none;
+  padding: 0.7em 2em;
+  border-radius: 0 0 8px 8px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: -1px; /* Pour coller à la box */
+}
+.tab-btn.active, .tab-btn:hover {
+  background: chocolate;
+  color: #222;
+}
+#structure-title {
+  margin: 0;
+  font-weight: bold;
+}
+#edit-title-btn {
+  background: none;
+  border: none;
+  color: #222;
+  font-size: 1.1em;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: color 0.2s;
+}
+#edit-title-btn:hover {
+  color: #fff;
+  background: chocolate;
+  border-radius: 50%;
+}
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+#timer {
+  font-size: 8em;
+  letter-spacing: 0.1em;
+}
+#timer.pause {
+  background: darkred;
+  color: #fff;
+  font-size: 8em;
+  letter-spacing: 0.1em;
+}
+#level {
+  font-size: 3em;
+}
+#blinds-info {
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: center;
+  font-size: 10em;
+  font-weight: bold;
+}
+#blinds-info.pause {
+  background: darkred;
+  color: #fff;
+  font-weight: bold;
+}
+#next-level-info {
+  margin: 0.5em 0 0.2em 0;
+  font-size: 2.25em;
+  color: #bbb;
+}
+#next-break-info {
+  font-size: 2.25em;
+  color: #bbb;
+}
+.controls button {
+  font-size: 1.2em;
+  margin: 0.3em;
+  padding: 0.5em 1.2em;
+  border: none;
+  border-radius: 8px;
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.controls button:hover {
+  background: #666;
+}
+#structure-table-container {
+  overflow-x: auto;
+  margin-top: 1em;
+}
+#structure-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #222;
+  color: #fff;
+}
+#structure-table th, #structure-table td {
+  border: 1px solid #555;
+  padding: 0.5em 1em;
+  text-align: center;
+}
+#structure-table th {
+  background: #444;
+}
+#structure-table tr.pause-row {
+  background: darkred;
+  color: #fff;
+  font-weight: bold;
+}
+#players-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #222;
+  color: #fff;
+  margin-top: 1em;
+}
+#players-table th, #players-table td {
+  border: 1px solid #555;
+  padding: 0.5em 1em;
+  text-align: center;
+}
+#players-table th {
+  background: #444;
+}
+#players-table input[type="checkbox"] {
+  transform: scale(1.3);
+  cursor: pointer;
+}
+#players-table tbody tr:hover {
+  background: #555;
+  cursor: pointer;
+}
+#tables-plan table {
+  border-collapse: collapse;
+  margin-top: 0.5em;
+  min-width: 350px;
+}
+#tables-plan th, #tables-plan td {
+  border: 1px solid #555;
+  padding: 0.4em 1em;
+  text-align: center;
+}
+#tables-plan th {
+  background: #444;
+}
+.table-graphic-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2em;
+  justify-content: center;
+  margin-bottom: 2em;
+}
+.table-graphic {
+  background: #222;
+  border-radius: 1.5em;
+  box-shadow: 0 0 16px #000a;
+  padding: 2em 2em 2.5em 2em;
+  min-width: 320px;
+  min-height: 560px;
+  position: relative;
+  margin-bottom: 2em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.table-graphic-title {
+  color: #ffb300;
+  font-size: 1.3em;
+  font-weight: bold;
+  margin-bottom: 1em;
+  text-align: center;
+}
+.seats-circle {
+  position: relative;
+  width: 260px;
+  height: 480px;
+  margin: 0 auto;
+}
+.seat {
+  position: absolute;
+  width: 90px;
+  height: 50px;
+  background: #333;
+  color: #fff;
+  border-radius: 1em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
+  box-shadow: 0 2px 8px #0006;
+  border: 2px solid #444;
+  transition: background 0.2s;
+}
+.seat-number {
+  font-size: 0.8em;
+  color: #ffb300;
+  font-weight: bold;
+}
+#tables-plan table {
+  border-collapse: collapse;
+  margin-top: 0.5em;
+  min-width: 250px;
+}
+#tables-plan th, #tables-plan td {
+  border: 1px solid #555;
+  padding: 0.4em 1em;
+  text-align: center;
+}
+#tables-plan th {
+  background: #444;
+}
+#tables-plan {
+  display: block;
+  width: 100%;
+}
+.tables-flex {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2em;
+}
+.table-block {
+  background: #222;
+  border-radius: 1.5em;
+  box-shadow: 0 0 16px #000a;
+  padding: 1em;
+  min-width: 25%;
+  max-width: 45%;
+  width:20%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.table-block table {
+  width: 100%;
+}
+#classement-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #222;
+  color: #fff;
+  margin-top: 1em;
+}
+#classement-table th, #classement-table td {
+  border: 1px solid #555;
+  padding: 0.5em 1em;
+  text-align: center;
+}
+#classement-table th {
+  background: #444;
+}
+#classement-table select:disabled {
+  background: #333;
+  color: #888;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+#popup-modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100vh;
+  background: #000a;
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+}
+
+#popup-modal-content {
+  background: #333;
+  color: #fff;
+  padding: 2em 3em;
+  border-radius: 1em;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: center;
+  box-sizing: border-box;
+  font-size: 2em;    /* font-size à 2em */
+  width:60%;
+}
+/* Style pour la ligne d'un joueur éliminé */
+.out-row {
+  background-color: #553333 !important; 
+  opacity: 0.8; 
+}
+
+/* Style pour les boutons IN/OUT dans le classement */
+.out-btn {
+  background-color: #d9534f; /* Rouge pour l'élimination */
+  color: white;
+  border: none;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.in-btn {
+  background-color: #5cb85c; /* Vert pour la réintégration */
+  color: white;
+  border: none;
+  padding: 0.4em 1em;
+  border-radius: 4px;
+  cursor: pointer;
+}
+/* style.css */
+
+/* Conteneur principal du switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 90px; /* Largeur totale du switch */
+  height: 34px; /* Hauteur totale du switch */
+  border-radius: 34px;
+  cursor: pointer;
+  transition: background-color 0.4s;
+  overflow: hidden; /* Empêche l'ombre du slider de déborder lors de l'animation */
+  /* S'assurer qu'il est bien centré et aligné dans la cellule du tableau */
+  margin: 0 auto; 
+}
+
+/* Fond pour l'état actif (Inscrit) */
+.toggle-switch.active {
+  background-color: #5cb85c; /* Vert */
+}
+
+/* Fond pour l'état inactif (Non-inscrit) */
+.toggle-switch.inactive {
+  background-color: #777; /* Gris */
+}
+
+/* Le petit cercle (slider) */
+.switch-slider {
+  position: absolute;
+  content: "";
+  height: 26px; /* Taille du cercle */
+  width: 26px;
+  left: 4px; /* Position de départ (à gauche) */
+  bottom: 4px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.4s; /* Animation du déplacement */
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Déplacement du cercle quand le switch est actif */
+.toggle-switch.active .switch-slider {
+  transform: translateX(56px); /* 90px (largeur) - 26px (slider) - 4px*2 (padding) = 56px environ */
+}
+
+/* Étiquette (texte Inscrit/Non-inscrit) */
+.switch-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-weight: bold;
+  font-size: 0.9em;
+  padding: 0 5px;
+  transition: opacity 0.4s;
+}
+
+/* Positionnement du texte en fonction de l'état */
+.toggle-switch.active .switch-label {
+    left: 10px; /* Texte "Inscrit" à gauche */
+    opacity: 1;
+}
+
+.toggle-switch.inactive .switch-label {
+    right: 10px; /* Texte "Non-inscrit" à droite */
+    opacity: 1;
+}
+
+/* Optionnel: Masquer le texte s'il est trop proche du slider */
+/* .toggle-switch.active .switch-label { display: none; }
+/* .toggle-switch.inactive .switch-label { display: none; } */
+
+/* Styles pour les lignes éliminées */
+.out-row {
+  background-color: #553333 !important; 
+  opacity: 0.8; 
+}
+.out-btn {
+  background-color: #d9534f; /* Rouge pour OUT */
+}
+.in-btn {
+  background-color: #5cb85c; /* Vert pour IN */
+}
+/* Conteneur principal pour la grille 2/3 - 1/3 */
+.tournoi-double-grid {
+  display: grid;
+  /* Définit 2 colonnes : 2 parts (2fr) et 1 part (1fr) */
+  grid-template-columns: 2fr 1fr; 
+  gap: 3em; /* Espace entre les colonnes */
+  width: 100%;
+}
+
+/* Colonne des statistiques/classement (1/3) */
+.grid-col-1-3 {
+  padding-left: 2em; 
+  border-left: 1px solid #555; /* Séparateur visuel */
+  font-size: 2em;
+}
+
+/* S'assurer que les titres d'horloge sont grands */
+#players-in-game, #average-stack {
+  margin-top: 1em;  
+  font-size: 2em;
+}
+#avg-stack-value, #current-players{
+  font-size: 3em ! important;
+  font-weight: bold;
+}
+/* S'assurer que les titres d'horloge sont grands */
+.grid-col-2-3 #level {
+    font-size: 1.5vw;
+}
+/* Styles pour le conteneur du minuteur (2/3) */
+.grid-col-2-3 {
+    /* Ajoutons un peu de flexibilité au texte à l'intérieur */
+    display: flex;
+    flex-direction: column;
+    justify-content: top;
+    align-items: center;
+}
+.grid-col-2-3, .grid-col-1-3 {
+    /* Permettre aux éléments longs (comme les blinds) d'être coupés
+       au lieu de forcer la colonne à s'étendre. */
+    min-width: 0; 
+}
+/* style.css - Styles pour le classement simplifié dans la colonne 1/3 */
+
+.simple-ranking-table {
+    width: 100%;
+    /* Supprime les bordures par défaut */
+    border-collapse: collapse;
+}
+
+/* Cellule du rang (colonne 1) */
+.simple-ranking-table .rank-cell {
+    /* Alignement du rang à droite */
+    text-align: right;
+    width: 15%; /* Pour donner assez d'espace au rang */
+    /* padding-right: 0.5em; */
+    /* Style visuel du rang */
+    color: #ffb300; 
+    font-weight: bold;
+}
+
+/* Cellule du nom du joueur (colonne 2) */
+.simple-ranking-table .name-cell {
+    /* Alignement du nom à gauche */
+    text-align: left;
+    padding-left: 0.5em;
+    /* Pour s'assurer que le nom est coupé s'il est trop long */
+    overflow: hidden;
+    white-space: nowrap; 
+    text-overflow: ellipsis; /* Ajoute des "..." si le nom est coupé */
+}
+
+.simple-ranking-table .btn-cell {
+    width: 20%; /* Pour donner de la place au bouton */
+    text-align: right;
+    /* padding-left: 0.5em; */
+}
+
+.simple-ranking-table .pts-ladder {
+    width: 20%; /* Pour donner de la place au bouton */
+    text-align: right;
+    color: #888!important;
+    /* padding-left: 0.5em; */
+}
+
+/* Style du bouton "OUT" dans le classement */
+.ranking-out-btn {
+    /* Style général des boutons OUT (utiliser la classe .out-btn existante) */
+    background-color: #d9534f; /* Rouge */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.3em 0.5em;
+    cursor: pointer;
+    font-size: 0.9em;
+    line-height: 1; /* Pour être compact */
+}
+/* style.css - Styles pour le classement du championnat (mimétisme Google Sheets) */
+
+/* Le conteneur principal du tableau */
+.ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #222;
+    border-collapse: collapse; /* Assure que les bordures de cellules se rejoignent */
+    color: #EEE; /* Texte sombre pour la lisibilité sur fond clair */
+    font-size: 0.95em;
+    border: 1px solid #ccc; /* Bordure extérieure légère */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
+}
+
+/* En-têtes de tableau (lignes du thead) */
+.ranking-table thead th {
+    background-color: #EEE; /* Gris très clair pour les en-têtes */
+    color: #222;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 12px;
+    border: 1px solid #ddd; /* Bordures d'en-tête légères */
+    border-top: none; /* Optionnel : pour un look plus épuré */
+}
+
+/* Cellules du corps du tableau */
+.ranking-table tbody td {
+    padding: 8px 12px;
+    border: 1px solid #444; /* Bordures de cellules très fines */
+}
+
+/* Bandes alternées pour améliorer la lecture */
+.ranking-table tbody tr:nth-child(even) {
+    background-color: #111; /* Blanc cassé pour les lignes paires */
+}
+.ranking-virtual-in {
+  font-weight:bold;
+  color:lightseagreen;
+/*  background-color:lightyellow ! important */
+}
+.ranking-virtual-out {
+  font-weight:normal;
+/*  color:beige; */
+}
+/* MISE EN AVANT: Style Top 33% pour le Fond Clair (Qualification Zone) */
+.top-33-percent {
+    background-color: #232 !important; /* Couleur pour les lignes impaires */
+    font-weight: bold;
+    font-size: larger;
+    border-left: 10px solid #24ba2c; /* Bordure gauche verte distincte */
+}
+.top-33-percent-even {
+    background-color: #232 !important; /* Couleur pour les lignes impaires */
+    font-weight: bold;
+    font-size: larger;
+    border-left: 10px solid #24ba2c; /* Bordure gauche verte distincte */
+}
