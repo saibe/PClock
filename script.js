@@ -73,9 +73,9 @@ function savePointsBareme(bareme) {
 
 function applyFontSizes() {
   return;
-  document.getElementById('level').style.fontSize = (baseFontSize * fontRatios.level) + 'em';
-  document.getElementById('timer').style.fontSize = (baseFontSize * fontRatios.timer) + 'em';
-  document.getElementById('blinds-info').style.fontSize = (baseFontSize * fontRatios.blinds) + 'em';
+  document.getElementById('level').style.fontSize           = (baseFontSize * fontRatios.level)     + 'em';
+  document.getElementById('timer').style.fontSize           = (baseFontSize * fontRatios.timer)     + 'em';
+  document.getElementById('blinds-info').style.fontSize     = (baseFontSize * fontRatios.blinds)    + 'em';
   document.getElementById('next-level-info').style.fontSize = (baseFontSize * fontRatios.nextLevel) + 'em';
   document.getElementById('next-break-info').style.fontSize = (baseFontSize * fontRatios.nextBreak) + 'em';
 }
@@ -86,18 +86,18 @@ function syncJoueursToClassement() {
     return;
   }
   classementData = window.joueursImportes.map(j => ({
-    winamax: j.winamax,
-    nom: j.nom,
-    prenom: j.prenom,
-    mpla: j.mpla,
-    round: '',
-    heure: '',
-    killer: '',
-    rank: '',
-    table: '',
-    seat: '',
-    actif: false,
-    pts: 0,
+    winamax:  j.winamax,
+    nom:      j.nom,
+    prenom:   j.prenom,
+    mpla:     j.mpla,
+    round:    '',
+    heure:    '',
+    killer:   '',
+    rank:     '',
+    table:    '',
+    seat:     '',
+    actif:    false,
+    pts:      0,
   }));
 
   // Réinitialise la liste des anciennes assignations
@@ -739,10 +739,12 @@ function renderClassement() {
           }
           
           // Dernier critère pour les Non-inscrits sans rank : MPLA
-          if (a.mpla < b.mpla) return -1;
-          if (a.mpla > b.mpla) return 1;
-          return 0;
-      }
+          const mplaA = a.mpla ? a.mpla.toLowerCase() : '';
+          const mplaB = b.mpla ? b.mpla.toLowerCase() : '';
+
+          if (mplaA < mplaB) return -1;
+          if (mplaA > mplaB) return 1;
+          return 0;      }
 
       // ----------------------------------------------------
       // Si les deux sont ACTIFS (Inscrit)
@@ -1523,55 +1525,3 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
   }
 });
-
-function parseCSV_champ(csvText) {
-  const lines = csvText.split('\n').filter(line => line.trim() !== '');
-  if (lines.length < 2) return []; // Moins de 2 lignes = pas de données
-
-  // CARTE DE CORRESPONDANCE : CSV Header -> Clé JS
-  const keyMapping = {
-      'prenom': 'Prénom', 
-      'mpla': 'Pseudo MPLA', 
-      'winamax': 'Pseudo Winamax', 
-      'rank': 'Rank', 
-      'points': 'Nombre points' 
-  };
-
-  // Trouver les indices des colonnes requises dans le CSV original
-  const columnIndices = {};
-  columnIndices['prenom'] = 0;
-  columnIndices['mpla'] = 1;
-  columnIndices['winamax'] = 2;
-  columnIndices['rank'] = 3;
-  columnIndices['points'] = 4;
-  
-  const data = [];
-
-  console.log("====> Premiere ligne:" +lines[0]);
-  structureTitle = lines[0].split(',')[0].trim().replace(/Championnat/g,'');
-  console.log("Title:"+structureTitle);
-
-  // Traitement des lignes de données (à partir de la 4ème ligne)
-  for (let i = 7; i < lines.length; i++) {
-      const currentLine = lines[i];
-      const values = currentLine.split(',');
-      
-      console.log(values);
-
-      const player = {};
-      
-      // Extraction et standardisation des colonnes
-      Object.keys(columnIndices).forEach(standardKey => {
-          const index = columnIndices[standardKey];
-          // Nettoyage de la valeur (trim et suppression des guillemets)
-          player[standardKey] = values[index].trim().replace(/"/g, ''); 
-      });
-      
-      // Filtrer les lignes vides
-      if (Object.values(player).some(val => val !== '')) {
-          data.push(player);
-      }
-  }
-  
-  return data;
-}

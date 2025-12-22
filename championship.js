@@ -2,13 +2,79 @@ let ROOMNAME='ASL Poker 72'
 let SEASON=14; // Saison
 let QUARTER=2; // Trimestre
 let NBQUALIF=0; // nombre de qualifé
+let ROOMPLAYERS = [];
+let POINTSLADDER = [];
+let INITIALSTRUCTURE = [];
 let CHAMPIONSHIP_RANKING=[];
 
-const CHAMPIONSHIP = {
-    roomname    : ROOMNAME,
-    season      : SEASON,
-    quarter     : QUARTER,
-    ranking     : CHAMPIONSHIP_RANKING
+
+// Structure pour un niveau de blindes ou une pause
+const StructureItem = {
+    round: 0,       // int
+    small_blind: 0, // int
+    big_blind: 0,   // int
+    duration: 0,    // time (en minutes ou secondes)
+    isBreak: false  // bool
+};
+
+const assignment = {
+    table: 0,       // int
+    seat: 0,        // int
+};
+
+// Structure pour un joueur dans un tournoi spécifique
+const TournamentPlayer = {
+    active: true,             // bool
+    player: PlayerIdentity,
+    rank: null,               // int (null si toujours en jeu)
+    assignment : assignment, 
+    score: 0,                 // int (points gagnés dans ce tournoi si vous utilisez cette clé)
+    round: StructureItem,     // round de sorti du joueur
+    killer: PlayerIdentity,   // le killer du joueur (PlayerIdentity)
+};
+
+// Structure pour un événement (tournoi)
+const Tournament = {
+    uuid: 0,
+    date: new Date(),           // La date de l'événement
+    title: "",                  // Titre du tournoi
+    structure: [StructureItem], // Liste des niveaux de blindes pour ce tournoi
+    ptsladder: [],              // Liste des points attribués (par rang)
+    round: 1,                   // Le niveau de blindes actuel
+    clock: 0,                   // Le temps restant sur le niveau actuel
+    players: [TournamentPlayer] // La liste des joueurs de ce tournoi
+};
+
+// Structure pour le classement général (leaderboard)
+const ChampionshipPlayer = {
+    player: PlayerIdentity,
+    rank: 0,                // int (rang actuel au classement général)
+    score: 0,               // int (score total au classement général)
+    played: 0,              // int (nombre de tournois joués)
+    scores: []              // list of int (liste des scores de chaque tournoi)
+};
+
+// Définition de la structure de base pour l'identité d'un joueur
+const PlayerIdentity = {
+    firstname: "", // string (prénom légal ou d'usage)
+    mpla: "",      // string (pseudo MPLA unique, utilisé comme clé)
+    winamax: "",   // string (pseudo sur la plateforme de jeu)
+};
+
+const Championship = {
+    uuid        : 0,
+    season      : SEASON   || 14,
+    quarter     : QUARTER  || 2,
+    ptsladder   : CHAMPIONSHIP_PTS_LADDER,
+    structure   : CHAMPIONSHIP_STRUCTURE,
+    tournaments : [Tournament],
+    players     : [ChampionshipPlayer],
+};
+
+const RoomData = {
+    roomname    : ROOMNAME || "ASL Poker 72",
+    championships:[Championship], // championships
+    Tournaments:  [Tournament]    // single tournaments
 };
 
 function loadCSV_champ(csvText) {

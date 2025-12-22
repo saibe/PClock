@@ -11,7 +11,7 @@ body {
 }
 .container-L, .container, .container-R {
   background: #333;
-  padding: 0em 1em;
+/*  padding: 0em 1em; */
   border-radius: 16px;
   box-shadow: 0 0 24px #000a;
   max-height: 100vh;
@@ -21,7 +21,7 @@ body {
 
 /* container secondaire droit*/
 .container-R {
-  text-align: right;
+  text-align: center;
   min-width: 350px;
   width:25%;
   box-sizing: border-box;
