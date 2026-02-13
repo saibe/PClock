@@ -968,7 +968,7 @@ function toggleOutClassement(mpla) {
     }
     
     // 5. Équilibrer les tables (si un joueur a quitté un siège ou doit en être réassigné)
-    const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+    const perTable = getDynamicPerTable();
     // On prend seulement les joueurs ACITFS/INSCRITS sans rang pour l'équilibrage
     const joueursActifs = classementData.filter(p => p.actif && (p.rank === null || p.rank === '')).map(p => ({ mpla: p.mpla }));
     classementData.forEach(p => {
@@ -1162,6 +1162,23 @@ function equilibrerTables(joueurs, perTable, oldAssignments = []) {
   return { assignments, changes, tablesCassees };
 }
 
+/**
+ * Retourne le nombre de joueurs par table ajusté dynamiquement.
+ * (gestion Table Finale automatique: nombre initial +1)
+ */
+function getDynamicPerTable() {
+  const input = document.getElementById('players-per-table');
+  const raw = parseInt(input?.value, 10);
+  const initial = Math.max(2, Number.isNaN(raw) ? 8 : raw);
+  const N = classementData.filter(p => p.actif && (p.rank === null || p.rank === '')).length;
+  const per = (2 * initial > N) ? (initial + 1) : initial;
+  // Ne pas modifier le champ DOM `#players-per-table` ici :
+  // on garde la valeur affichée telle quelle pour éviter des effets secondaires
+  // lors d'un "retable" manuel. La règle est appliquée en interne seulement.
+  console.log('getDynamicPerTable ->', { initial: initial, N: N, per: per });
+  return per;
+}
+
 function syncSelectedPlayersIndexes() {
   selectedPlayersIndexes = [];
   const rows = Array.from(document.querySelectorAll('#players-table tbody tr'));
@@ -1191,8 +1208,8 @@ function assignSeats() {
   }
 
   console.log(joueurs);
-  // Nombre de joueurs max par table
-  const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+  // Nombre de joueurs max par table (ajusté dynamiquement)
+  const perTable = getDynamicPerTable();
   console.log('perTables:'+perTable);
 
   // Construit oldAssignments à partir de classementData pour les joueurs payés
@@ -1303,7 +1320,7 @@ function renderTablesPlan() {
   }
 
   // Récupère le nombre de joueurs par table (optionnel, pour l'affichage)
-  const perTable = Math.max(2, parseInt(document.getElementById('players-per-table').value) || 8);
+  const perTable = getDynamicPerTable();
 
   // Regroupe par table
   const tables = {};
