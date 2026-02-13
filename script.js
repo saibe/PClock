@@ -47,6 +47,24 @@ for (let i = 25; i <= 50; i++) {
 }
 let POINTS_BAREME_DATA = getPointsBareme();
 
+const socket = io('http://zefoumi.cluster121.hosting.ovh.net:3000/');
+// Si le serveur envoie une mise à jour, on l'applique
+socket.on('sync_game', (data) => {
+    timeLeft = data.timeLeft;
+    running = data.running;
+    currentLevel = data.currentLevel;
+    updateUI(); // Rafraîchit l'affichage du chrono et des blinds
+});
+
+// Et quand tu modifies quelque chose (ex: bouton Pause)
+function broadcastState() {
+    socket.emit('update_game', {
+        timeLeft: timeLeft,
+        running: running,
+        currentLevel: currentLevel
+    });
+}
+
 /**
  * Charge le barème depuis localStorage ou utilise la version par défaut.
  * @returns {Array<Object>} Le barème de points actuel.
@@ -1306,12 +1324,12 @@ function renderTablesPlan() {
       if (mpla) {
         html += `<tr>
           <td style="width:3em;">${s + 1}</td>
-          <td style="font-weight:bold; font-size:1.1em;">${mpla || '-'}</td>
+          <td class="player-cell" data-table="${tableNum}" data-seat="${s+1}" data-mpla="${mpla}" draggable="true" style="font-weight:bold; font-size:1.1em;">${mpla || '-'}</td>
         </tr>`;
       } else {
         html += `<tr>
           <td style="width:3em;">${s + 1}</td>
-          <td style="font-style:italic; color:#bbb;">(vide)</td>
+          <td class="player-cell empty" data-table="${tableNum}" data-seat="${s+1}" data-mpla="" style="font-style:italic; color:#bbb;">(vide)</td>
         </tr>`;
       }
     }
@@ -1319,6 +1337,107 @@ function renderTablesPlan() {
   });
   html += '</div>';
   document.getElementById('tables-plan').innerHTML = html;
+
+  // Ajoute les gestionnaires drag & drop pour échange de joueurs
+  const playerCells = document.querySelectorAll('#tables-plan .player-cell');
+  playerCells.forEach(td => {
+    td.addEventListener('dragstart', onSeatDragStart);
+    td.addEventListener('dragover', onSeatDragOver);
+    td.addEventListener('dragleave', onSeatDragLeave);
+    td.addEventListener('drop', onSeatDrop);
+  });
+}
+
+// Drag & Drop handlers
+function onSeatDragStart(e) {
+  const td = e.currentTarget;
+  const table = td.dataset.table;
+  const seat = td.dataset.seat;
+  const mpla = td.dataset.mpla || '';
+  // Empêche de drag une case vide
+  if (!mpla) { e.preventDefault(); return; }
+  e.dataTransfer.setData('text/plain', JSON.stringify({ table: parseInt(table), seat: parseInt(seat), mpla }));
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onSeatDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onSeatDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onSeatDrop(e) {
+  e.preventDefault();
+  const destTd = e.currentTarget;
+  destTd.classList.remove('drag-over');
+  const destTable = parseInt(destTd.dataset.table);
+  const destSeat = parseInt(destTd.dataset.seat);
+  const destMpla = destTd.dataset.mpla || '';
+  const src = JSON.parse(e.dataTransfer.getData('text/plain'));
+
+  const srcObj = { table: src.table, seat: src.seat, mpla: src.mpla };
+  const destObj = { table: destTable, seat: destSeat, mpla: destMpla };
+
+  swapSeats(srcObj, destObj);
+  renderTablesPlan();
+  renderClassement();
+  exportAppToJSON();
+}
+
+function swapSeats(src, dest) {
+  // Recherche des assignments dans playerAssignments
+  const srcIdx = playerAssignments.findIndex(a => parseInt(a.table) === parseInt(src.table) && parseInt(a.seat) === parseInt(src.seat));
+  const destIdx = playerAssignments.findIndex(a => parseInt(a.table) === parseInt(dest.table) && parseInt(a.seat) === parseInt(dest.seat));
+
+  // Met à jour classementData en fonction des échanges
+  const pSrc = classementData.find(p => p.mpla === src.mpla);
+  const pDest = classementData.find(p => p.mpla === dest.mpla);
+
+  // Si on déplace vers une case vide
+  if ((!dest.mpla || dest.mpla === '') && src.mpla) {
+    // Met à jour playerAssignments
+    if (srcIdx !== -1) {
+      playerAssignments[srcIdx].table = dest.table;
+      playerAssignments[srcIdx].seat = dest.seat;
+    } else {
+      // Ajouter si absent
+      playerAssignments.push({ mpla: src.mpla, table: dest.table, seat: dest.seat });
+    }
+
+    // Met à jour classementData
+    if (pSrc) { pSrc.table = dest.table; pSrc.seat = dest.seat; }
+
+    // Supprime éventuelle ancienne assignation dest (vide donc rien à faire)
+    if (srcIdx !== -1 && destIdx !== -1 && srcIdx !== destIdx) {
+      // cas improbable
+    }
+    return;
+  }
+
+  // Si les deux sont remplis, échange
+  if (src.mpla && dest.mpla) {
+    // Met à jour playerAssignments
+    if (srcIdx !== -1) {
+      playerAssignments[srcIdx].table = dest.table;
+      playerAssignments[srcIdx].seat = dest.seat;
+    }
+    if (destIdx !== -1) {
+      playerAssignments[destIdx].table = src.table;
+      playerAssignments[destIdx].seat = src.seat;
+    }
+    // Si un des deux n'existait pas dans playerAssignments, on le crée
+    if (srcIdx === -1) playerAssignments.push({ mpla: src.mpla, table: dest.table, seat: dest.seat });
+    if (destIdx === -1) playerAssignments.push({ mpla: dest.mpla, table: src.table, seat: src.seat });
+
+    // Met à jour classementData
+    if (pSrc) { pSrc.table = dest.table; pSrc.seat = dest.seat; }
+    if (pDest) { pDest.table = src.table; pDest.seat = src.seat; }
+    return;
+  }
 }
 
 function restoreAppFromLocalStorage() {

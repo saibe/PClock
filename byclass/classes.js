@@ -55,7 +55,8 @@ class Championship {
 }
 
 class Room {
-    constructor(name, championships = []) {
+    constructor(name, championships = [], uuid = null) {
+        this.uuid = uuid || crypto.randomUUID();
         this.name = name;
         this.championships = championships.map(c => 
             new Championship(c.uuid, c.name, c.tournaments, c.players)
@@ -88,10 +89,10 @@ class RoomsManager {
     loadFromLocalStorage() {
         const data = localStorage.getItem(this.storageKey);
         const rawArray = data ? JSON.parse(data) : [];
-        // On réhydrate chaque objet brut en instance de la classe Room
-        return rawArray.map(r => new Room(r.name, r.championships));
+        
+        // On passe r.uuid en 3ème paramètre pour conserver l'ID existant
+        return rawArray.map(r => new Room(r.name, r.championships, r.uuid)); 
     }
-
     // Sauvegarde l'état actuel dans le LocalStorage
     saveToLocalStorage() {
         localStorage.setItem(this.storageKey, JSON.stringify(this.allRooms));
@@ -102,6 +103,11 @@ class RoomsManager {
         return this.allRooms.find(r => r.name === name);
     }
 
+    // Trouve une salle par son nom
+    getRoomByUuid(uuid) {
+        return this.allRooms.find(r => r.uuid === uuid);
+    }
+
     // Ajoute une salle et sauvegarde
     addRoom(name) {
         if (this.getRoom(name)) return { success: false, message: "Existe déjà" };
@@ -110,4 +116,16 @@ class RoomsManager {
         this.saveToLocalStorage();
         return { success: true, room: newRoom };
     }
+    // Supprime une salle et sauvegarde
+    delRoom(uuid) {
+        const initialLength = this.allRooms.length;
+        this.allRooms = this.allRooms.filter(r => r.uuid !== uuid);
+        
+        if (this.allRooms.length < initialLength) {
+            this.saveToLocalStorage();
+            return { success: true, message: "Room deleted successfully" };
+        }
+        return { success: false, message: "Room not found" };
+    }
 }
+

@@ -85,6 +85,7 @@ function loadCSV_champ(csvText) {
     NBQUALIF = lines[2].split(",")[19];
     nbrounds = Math.max(...lines[4].split(",").filter(el => !isNaN(el.trim())).map(Number));
     console.log("####### nbround:"+nbrounds);
+    CHAMPIONSHIP_RANKING=[];
     for (let i = 5; i < lines.length; i++) {
         const [prenom, mpla, winamax, rank, score, played, ...rounds] = lines[i].split(',');
         if(mpla) {
