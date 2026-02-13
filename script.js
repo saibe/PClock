@@ -549,6 +549,47 @@ function showTab(tab) {
 }
 
 /**
+ * Remet tous les joueurs en jeu et retire les assignations de sièges
+ * - active tous les joueurs
+ * - vide rank/pts/heure/round/killer
+ * - retire table et seat
+ * - vide playerAssignments
+ * - met à jour l'affichage et sauvegarde
+ */
+function resetTournoi() {
+  // Remettre tous les joueurs en jeu
+  classementData.forEach(p => {
+    // Ne pas modifier `p.actif` (inscrit/non inscrit) — laissé tel quel
+    p.rank = '';
+    p.pts = 0;
+    p.heure = '';
+    p.round = '';
+    p.killer = '';
+    p.table = null;
+    p.seat = null;
+  });
+
+  // Supprimer toutes les assignations conservées
+  playerAssignments = [];
+
+  // Mettre à jour l'affichage
+  renderClassement();
+  renderClassementSimplifie();
+  renderTablesPlan();
+  renderChampionnatRanking();
+  updatePlayerStatusDisplay();
+  exportAppToJSON();
+  // Remettre la clock au début de la structure
+  try {
+    stopTimer();
+  } catch (e) { /* ignore if stopTimer not available */ }
+  currentLevel = 0;
+  timeLeft = levels[0]?.duration || 0;
+  running = false;
+  updateDisplay();
+}
+
+/**
  * Gère l'édition d'une cellule de points et sauvegarde le nouveau barème.
  * @param {HTMLElement} element - La cellule <td> modifiée.
  * @param {number} rank - Le rang associé à cette cellule.
