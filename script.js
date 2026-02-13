@@ -932,6 +932,24 @@ function toggleOutClassement(mpla) {
         // 4. Retirer l'assignation de table/siège
         classementData[index].table = null;
         classementData[index].seat = null;
+        // Si après cette élimination il ne reste qu'UN joueur en jeu,
+        // on le marque automatiquement OUT et on arrête le chrono.
+        const remainingPlayers = classementData.filter(p => p.actif && (p.rank === null || p.rank === ''));
+        if (remainingPlayers.length === 1) {
+          const remaining = remainingPlayers[0];
+          // Le rang du dernier sera juste au-dessus de celui qui vient d'être marqué
+          const lastRank = N_registered - rankedCount - 1; // ex: si N=10, rankedCount=8 -> lastRank=1
+          remaining.rank = lastRank;
+          const now2 = new Date();
+          remaining.heure = now2.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + now2.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+          remaining.round = currentLevel;
+          remaining.pts = (DEFAULT_POINTS_BAREME.find(item => item.rank === remaining.rank) || {}).points || 0;
+          // Retire aussi sa table/siège
+          remaining.table = null;
+          remaining.seat = null;
+          // Stoppe le chrono
+          try { stopTimer(); } catch (e) { console.warn('stopTimer failed', e); }
+        }
         
     } else {
         // ===================================
@@ -1175,7 +1193,6 @@ function getDynamicPerTable() {
   // Ne pas modifier le champ DOM `#players-per-table` ici :
   // on garde la valeur affichée telle quelle pour éviter des effets secondaires
   // lors d'un "retable" manuel. La règle est appliquée en interne seulement.
-  console.log('getDynamicPerTable ->', { initial: initial, N: N, per: per });
   return per;
 }
 
