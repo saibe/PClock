@@ -383,6 +383,23 @@ function prevLevel() {
   }
 }
 
+// Toggle visibility of left/right side panels (non-overlay)
+function toggleLeftPanel() {
+  const panel = document.querySelector('.container-L');
+  const btn = document.getElementById('toggle-left-btn');
+  if (!panel || !btn) return;
+  const hidden = panel.classList.toggle('hidden-panel');
+  btn.textContent = hidden ? 'Afficher Gauche' : '≡';
+}
+
+function toggleRightPanel() {
+  const panel = document.querySelector('.container-R');
+  const btn = document.getElementById('toggle-right-btn');
+  if (!panel || !btn) return;
+  const hidden = panel.classList.toggle('hidden-panel');
+  btn.textContent = hidden ? 'Afficher Droite' : '≡';
+}
+
 function toggleTimer() {
   if (running) {
     stopTimer();

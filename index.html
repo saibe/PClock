@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Poker Clock</title>
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
@@ -9,7 +10,9 @@
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
+  <!-- Side toggles (kept for compatibility; hidden on stacked layout) -->
   <div class="container-L">
+    <div id="toggle-left-btn" class="side-toggle left" onclick="toggleLeftPanel()">≡</div>
     <div id="datetime" class="datetime"></div>
     <div id="players-in-game">
       <u>Joueurs:</u><br/><span id="current-players">--</span>
@@ -25,6 +28,10 @@
     <div class="title">
       <h1 id="structure-title" style="display:inline;">Structure Tournoi</h1>
       <button id="edit-title-btn" title="Modifier le titre" style="margin-left:0.5em; font-size:1em; vertical-align:middle; cursor:pointer;">✏️</button>
+<!---
+        <button id="toggle-left-btn" onclick="toggleLeftPanel()" title="" style="margin-left:0.5em; font-size:0.9em; vertical-align:middle;">Masquer Gauche</button>
+        <button id="toggle-right-btn" onclick="toggleRightPanel()" title="" style="margin-left:0.5em; font-size:0.9em; vertical-align:middle;">Masquer Droite</button>
+--->
     </div>
     <div class="tabs">
         <div class="tab-buttons-group"> 
@@ -113,6 +120,7 @@
     </div>
   </div>
   <div class="container-R">
+    <div id="toggle-right-btn" class="side-toggle right" onclick="toggleRightPanel()">≡</div>
     <div><h2 style="color:#ffb300">Championnat <span style="border-radius:5px;padding:2px 4px;color:white;background:red;">&bull; live</span></h2></div>
     <div id="championnat-ranking-container" style="margin-bottom: 2em;">
   </div>

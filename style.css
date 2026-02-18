@@ -614,3 +614,39 @@ body {
     font-size: larger;
     border-left: 10px solid #24ba2c; /* Bordure gauche verte distincte */
 }
+
+/* Utility class used to hide side panels when requested */
+.hidden-panel {
+/*
+  display: none !important;
+*/
+  width: 10px !important;
+  min-width: 10px !important;
+  max-width: 10px !important;
+}
+
+/* Side-toggle vertical buttons along the sides of the viewport */
+.side-toggle {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 160px;
+  background: #444;
+  color: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3000;
+  box-shadow: 0 2px 8px #0008;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
+  font-size: 0.95em;
+  user-select: none;
+}
+
+.side-toggle.left { left: 6px; }
+.side-toggle.right { right: 6px; }
