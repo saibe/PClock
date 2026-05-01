@@ -71,8 +71,16 @@
     </div>
 
     <div id="tab-players" class="tab-content">
-      <input style="width:60%;" type="url" id="players-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR5dovbFD3uwJ5_cHcOfDrHQrNfwJxs0w9LT7R_0Bml2Euw7cFT-mS5rC4821yjcM2hw-C5ykypXC8C/pub" style="width: 80%; padding: 0.5em; margin-bottom: 1em;">
-      <button style="width:20%;" onclick="importPlayersCSV(document.getElementById('players-url').value)">Import players</button>
+      <div style="display:flex;gap:0.5em;margin-bottom:0.5em;align-items:center;">
+        <input style="flex:1;" type="url" id="players-url" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR5dovbFD3uwJ5_cHcOfDrHQrNfwJxs0w9LT7R_0Bml2Euw7cFT-mS5rC4821yjcM2hw-C5ykypXC8C/pub" placeholder="URL du sheet (optionnel)">
+        <button style="width:12em;" onclick="importPlayersCSV(document.getElementById('players-url').value)">Importer players</button>
+      </div>
+      <div style="margin-bottom:0.8em; display:flex; gap:0.5em; align-items:center;">
+        <input id="new-player-prenom" placeholder="Prénom" style="width:30%; padding:0.4em;">
+        <input id="new-player-mpla" placeholder="MPLA (identifiant)" style="width:30%; padding:0.4em;">
+        <input id="new-player-winamax" placeholder="Winamax" style="width:30%; padding:0.4em;">
+        <button style="width:8em;" onclick="addPlayerFromForm()">Ajouter</button>
+      </div>
       <div id="players-table-container"></div>
     </div>
 

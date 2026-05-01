@@ -206,9 +206,50 @@ function importPlayersCSV(url=PLAYERS_CSV_URL) {
       document.getElementById('players-table-container').innerHTML = html;
       // Stocke la liste brute pour la synchronisation
       window.joueursImportes = data.map(row => ({
-        prenom: row[0] || '', mpla: row[1] || '', winamax: row[2] || ''
+        prenom: row[0] || '', nom: '', mpla: row[1] || '', winamax: row[2] || ''
       }));
     });
+}
+
+/**
+ * Rend la table des joueurs importés (ou ajoutés manuellement)
+ */
+function renderPlayersImportedTable() {
+  const container = document.getElementById('players-table-container');
+  if (!container) return;
+  if (!window.joueursImportes || window.joueursImportes.length === 0) {
+    container.innerHTML = '<p>Aucun joueur importé.</p>';
+    return;
+  }
+  let html = '<table id="players-table"><thead><tr>' +
+             '<th>Prénom</th><th>MPLA</th><th>Winamax</th></tr></thead><tbody>';
+  window.joueursImportes.forEach(p => {
+    html += `<tr><td>${p.prenom || ''}</td><td>${p.mpla || ''}</td><td>${p.winamax || ''}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+/**
+ * Ajoute un joueur depuis le formulaire présent dans l'onglet 'players'.
+ */
+function addPlayerFromForm() {
+  const prenom = document.getElementById('new-player-prenom').value.trim();
+  const mpla = document.getElementById('new-player-mpla').value.trim();
+  const winamax = document.getElementById('new-player-winamax').value.trim();
+  if (!mpla) { alert('Le champ MPLA est requis.'); return; }
+  window.joueursImportes = window.joueursImportes || [];
+  // Vérifie doublon
+  if (window.joueursImportes.find(j => j.mpla === mpla)) {
+    alert('Un joueur avec ce MPLA existe déjà dans la liste importée.');
+    return;
+  }
+  window.joueursImportes.push({ prenom: prenom || '', nom: '', mpla: mpla, winamax: winamax || '' });
+  renderPlayersImportedTable();
+  // Vide le formulaire
+  document.getElementById('new-player-prenom').value = '';
+  document.getElementById('new-player-mpla').value = '';
+  document.getElementById('new-player-winamax').value = '';
 }
 
 // Date et heure en haut
