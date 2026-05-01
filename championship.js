@@ -78,8 +78,17 @@ const RoomData = {
 };
 
 function loadCSV_champ(csvText) {
+    console.log("####### csvText:");
+    console.log(csvText);
     let cleanedCsvText = csvText.replace(/\"([^\"]*)\n([^\"]*)\"/g, '$1 $2');
     const lines = cleanedCsvText.split('\n').filter(line => line.trim() !== '');
+    console.log("####### lines:");
+    console.log(lines);
+    console.log("####### lines[2]:");
+    console.log(lines[2]);
+    console.log("####### lines[4]:");
+    console.log(lines[4]);
+
     if (lines.length < 2) return []; // Moins de 2 lignes = pas de données
 
     NBQUALIF = lines[2].split(",")[19];

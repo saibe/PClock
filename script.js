@@ -41,6 +41,14 @@ const DEFAULT_POINTS_BAREME = [
     { rank: 19, points:  35 }, { rank: 20, points:  30 }, { rank: 21, points:  25 },
     { rank: 22, points:  20 }, { rank: 23, points:  15 }, { rank: 24, points:  10 }
 ];
+const DEFAULT_POINTS_BAREME_16 = [
+    { rank:  1, points: 300 }, { rank:  2, points: 230 }, { rank:  3, points: 180 },
+    { rank:  4, points: 140 }, { rank:  5, points: 110 }, { rank:  6, points:  90 },
+    { rank:  7, points:  70 }, { rank:  8, points:  50 }, { rank:  9, points:  40 },
+    { rank: 10, points:  30 }, { rank: 11, points:  25 }, { rank: 12, points:  20 },
+    { rank: 13, points:  15 }, { rank: 14, points:  10 }, { rank: 15, points:   5 },
+    { rank: 16, points:   5 }
+];
 // Rangs 25 à 50 à 5 points
 for (let i = 25; i <= 50; i++) {
     DEFAULT_POINTS_BAREME.push({ rank: i, points: 5 });
@@ -80,6 +88,48 @@ function getPointsBareme() {
         }));
     }
     return DEFAULT_POINTS_BAREME;
+}
+
+/**
+ * Retourne le barème de points à utiliser selon le nombre total d'inscrits.
+ * Si le nombre total est <= 16 et qu'un barème 16 existe, on l'utilise.
+ * Sinon on utilise `POINTS_BAREME_DATA` (barème éditable) ou `DEFAULT_POINTS_BAREME` en fallback.
+ * @param {number} totalRegistered
+ * @returns {Array<Object>} tableau d'objets {rank, points}
+ */
+function selectPointsBareme(totalRegistered) {
+  if (typeof totalRegistered !== 'number') totalRegistered = parseInt(totalRegistered) || 0;
+  if (totalRegistered <= 16 && Array.isArray(DEFAULT_POINTS_BAREME_16) && DEFAULT_POINTS_BAREME_16.length > 0) {
+    return DEFAULT_POINTS_BAREME_16;
+  }
+  if (Array.isArray(POINTS_BAREME_DATA) && POINTS_BAREME_DATA.length > 0) return POINTS_BAREME_DATA;
+  return DEFAULT_POINTS_BAREME;
+}
+
+/**
+ * Renvoie le nombre de points correspondant à un rang donné selon le barème actif.
+ * @param {number} rank
+ * @param {number} totalRegistered
+ * @returns {number}
+ */
+function getPointsForRank(rank, totalRegistered) {
+  const bareme = selectPointsBareme(totalRegistered);
+  if (!rank || rank <= 0) return 0;
+  // Cherche une correspondance exacte par `rank`
+  if (Array.isArray(bareme)) {
+    const item = bareme.find(it => it.rank === rank);
+    if (item && typeof item.points === 'number') return item.points;
+
+    // Si le rang demandé dépasse le dernier rang défini, renvoyer la valeur du dernier rang
+    const sorted = bareme.slice().sort((a, b) => a.rank - b.rank);
+    const last = sorted[sorted.length - 1];
+    if (rank > last.rank) return last.points || 0;
+
+    // Sinon, si l'index (rank-1) existe, l'utiliser
+    const idx = rank - 1;
+    if (sorted[idx]) return sorted[idx].points || 0;
+  }
+  return 0;
 }
 
 /**
@@ -742,8 +792,10 @@ function renderClassementSimplifie() {
     htmlContent = '<table class="simple-ranking-table"><tbody>';
 
     // 3. Générer les lignes du tableau (Rang | Nom | Bouton OUT)
+    const N_registered = classementData.filter(p => p.actif === true).length;
+    const activeBareme = selectPointsBareme(N_registered);
     rankedPlayers.forEach((p, index) => {
-        const ptsLadder = DEFAULT_POINTS_BAREME[index].points+'pts';
+      const ptsLadder = (activeBareme[index] && activeBareme[index].points ? activeBareme[index].points : 0) + 'pts';
         const buttonText = p.rank ?  ptsLadder : 'X'; 
         const buttonClass = p.rank ? '' : 'out-btn';
         const rankText = p.rank ? p.rank : '';
@@ -979,8 +1031,8 @@ function toggleOutClassement(mpla) {
         classementData[index].round = currentLevel; 
 
         // 3. Attribution des points au joueur 
-        classementData[index].pts = DEFAULT_POINTS_BAREME.find(item => item.rank === classementData[index].rank).points;
-        joueurRestantPts = DEFAULT_POINTS_BAREME.find(item => item.rank === (classementData[index].rank - 1)).points;
+            classementData[index].pts = getPointsForRank(parseInt(classementData[index].rank), N_registered);
+            joueurRestantPts = getPointsForRank(parseInt(classementData[index].rank) - 1, N_registered);
         classementData.forEach(p => {
           if (p.actif && (p.rank === null || p.rank === '')) {
             p.pts = joueurRestantPts;
@@ -1001,7 +1053,7 @@ function toggleOutClassement(mpla) {
           const now2 = new Date();
           remaining.heure = now2.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + now2.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
           remaining.round = currentLevel;
-          remaining.pts = (DEFAULT_POINTS_BAREME.find(item => item.rank === remaining.rank) || {}).points || 0;
+          remaining.pts = getPointsForRank(parseInt(remaining.rank), N_registered) || 0;
           // Retire aussi sa table/siège
           remaining.table = null;
           remaining.seat = null;
@@ -1022,7 +1074,8 @@ function toggleOutClassement(mpla) {
         classementData[index].killer = ''; 
 
         nbJoueursRestant = classementData.filter(p => p.actif && (p.rank === null || p.rank === '' | p.rank === 0)).length;
-        joueurRestantPts = DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points;
+        // On choisit le barème en fonction du nombre total d'inscrits
+        joueurRestantPts = getPointsForRank(nbJoueursRestant, N_registered);
         classementData.forEach(p => {
           if (p.actif && (p.rank === null || p.rank === '')) {
             p.pts = joueurRestantPts;
@@ -1303,13 +1356,16 @@ function assignSeats() {
   console.log(assignments);
 
   nbJoueursRestant = classementData.filter(p => p.actif && (p.rank === null || p.rank === '' | p.rank === 0)).length;
+  // Choisit le barème à appliquer selon le nombre total d'inscrits
+  const N_registered_assign = classementData.filter(p => p.actif === true).length;
+  const baremeForAssign = selectPointsBareme(N_registered_assign);
   // Mets à jour classementData pour TOUS les joueurs payés
   assignments.forEach(a => {
     let p = classementData.find(p => p.mpla === a.mpla);
     if (p) {
       p.table = a.table;
       p.seat = a.seat;
-      p.pts = DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points;
+      p.pts = getPointsForRank(nbJoueursRestant, N_registered_assign);
     } else {
       classementData.push({
         mpla: a.mpla,
@@ -1320,7 +1376,7 @@ function assignSeats() {
         table: a.table,
         seat: a.seat,
         actif: true,
-        pts: DEFAULT_POINTS_BAREME[nbJoueursRestant-1].points,
+        pts: getPointsForRank(nbJoueursRestant, N_registered_assign),
       });
     }
   });
