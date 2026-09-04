@@ -48,6 +48,7 @@
     <div id="tab-clock" class="tab-content active">
   
       <h3 id="level">Niveau 1</h3>
+      <div id="round-comment" aria-live="polite"><span id="round-comment-text"></span></div>
       <div id="timer">--:--</div>
       <div id="blinds-info">-</div>
       <div id="next-level-info" style="text-align:center; margin-top: 1em;"></div>
@@ -67,6 +68,15 @@
     </div>
 
     <div id="tab-structure" class="tab-content">
+      <div style="display:flex;gap:0.5em;margin-bottom:1em;align-items:center;">
+        <label for="structure-url">URL de la structure :</label>
+        <input id="structure-url" type="url" style="flex:1;padding:0.4em;" placeholder="URL CSV Google Sheets">
+        <button onclick="setStructureURL()">Charger</button>
+      </div>
+      <div style="display:flex;gap:0.5em;margin-bottom:1em;">
+        <button onclick="addStructureLevel(false)">+ Ajouter un niveau</button>
+        <button onclick="addStructureLevel(true)">+ Ajouter un break</button>
+      </div>
       <div id="structure-table-container"></div>
     </div>
 

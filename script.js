@@ -1,4 +1,6 @@
-const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
+const DEFAULT_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP4yXvMjqxO-FKxa9fw6flwJ0IzeUH1dO16gUcy_HsDsn_eBDkQFw-6A8hf4zNUol-l2-voplefB6E/pub?gid=1237545506&single=true&output=csv';
+const STRUCTURE_URL_STORAGE_KEY = 'pclockStructureCsvUrl';
+let CSV_URL = localStorage.getItem(STRUCTURE_URL_STORAGE_KEY) || DEFAULT_CSV_URL;
 const PLAYERS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1jrwdnsvv2XckXTabVCZOrtzBzprDqDNmemQuiyOmGqU/edit?gid=542055167#gid=542055167&single=true&output=csv';
 
 
@@ -8,8 +10,13 @@ let currentLevel = 0;
 let timeLeft = 0;
 let timerInterval = null;
 let running = false;
+let tournamentStartedAt = null;
+let actualLevelStartTimes = [];
+let pauseStartedAt = null;
+let futureScheduleDelayMs = 0;
 let dateOfTheDay= new Date();
 let structureTitle = 'ASL POKER 72 - S14T2 - ' + dateOfTheDay.getDate() + '/' + (dateOfTheDay.getMonth()+1);
+let structureStartTime = '20:00';
 let selectedPlayersIndexes = [];
 let playerAssignments = []; // [{index, table, seat}]
 let classementData = [];
@@ -173,6 +180,7 @@ function syncJoueursToClassement() {
 
   renderClassement();
   renderTablesPlan();
+  updateDisplay();
   exportAppToJSON();
 }
 
@@ -246,6 +254,7 @@ function addPlayerFromForm() {
   }
   window.joueursImportes.push({ prenom: prenom || '', nom: '', mpla: mpla, winamax: winamax || '' });
   renderPlayersImportedTable();
+  refreshStructureRows();
   // Vide le formulaire
   document.getElementById('new-player-prenom').value = '';
   document.getElementById('new-player-mpla').value = '';
@@ -305,14 +314,21 @@ function updatePlayerStatusDisplay() {
     }
 }
 
-async function loadStructure() {
+async function loadStructure(url = CSV_URL) {
   try {
-    const response = await fetch(CSV_URL);
+    const requestUrl = new URL(url, window.location.href);
+    requestUrl.searchParams.set('_pclock', Date.now());
+    const response = await fetch(requestUrl.toString(), { cache: 'no-store' });
     if (!response.ok) throw new Error('Erreur de chargement du CSV');
     const csvText = await response.text();
     const data = parseCSV(csvText);
 
-    levels = [];
+    const loadedLevels = [];
+    const firstDataRow = data[1] || data[0] || [];
+    if (/^\d{1,2}:\d{2}$/.test(String(firstDataRow[0] || '').trim())) {
+      structureStartTime = String(firstDataRow[0]).trim();
+    }
+    // data[0] contient les titres de colonnes du CSV (Heure, Round, Level, ...).
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const levelNum = row[2];
@@ -324,7 +340,9 @@ async function loadStructure() {
 
       // Ajoute le niveau si présent
       if (levelNum && roundDuration && sb && bb) {
-        levels.push({
+        loadedLevels.push({
+          round: String(levelNum || '').trim(),
+          comment: '',
           label: `Niveau ${levelNum}`,
           blinds: `${sb} / ${bb}`,
           ante: (ante && parseInt(ante) > 0) ? `Ante: ${ante}` : '',
@@ -334,7 +352,9 @@ async function loadStructure() {
       }
       // Ajoute le break si présent
       if (breakDuration && parseInt(breakDuration) > 0) {
-        levels.push({
+        loadedLevels.push({
+          round: '',
+          comment: '',
           label: `BREAK`,
           blinds: '-',
           ante: '',
@@ -344,7 +364,17 @@ async function loadStructure() {
       }
     }
 
-    if (levels.length === 0) throw new Error('Aucun niveau trouvé dans la structure.');
+    if (loadedLevels.length === 0) throw new Error('Aucun niveau trouvé dans la structure.');
+
+    // Ne remplace la structure locale qu'après un chargement CSV réussi.
+    levels = normalizeRestoredStructureLabels(loadedLevels);
+    stopTimer();
+    tournamentStartedAt = null;
+    actualLevelStartTimes = [];
+    pauseStartedAt = null;
+    futureScheduleDelayMs = 0;
+    currentLevel = 0;
+    timeLeft = levels[0].duration;
 
     // Sécurisation de l'accès aux variables globales (réinitialisation si la structure est plus courte)
     if (currentLevel >= levels.length) {
@@ -356,15 +386,86 @@ async function loadStructure() {
     
     updateDisplay();
     renderStructureTable();
+    exportAppToJSON();
+    return true;
   } catch (e) {
-    alert.error("Erreur de chargement de la structure:", e);
+    console.error('Erreur de chargement de la structure:', e);
+    alert(`Erreur de chargement de la structure : ${e.message}`);
+    return false;
   }
+}
+
+function setStructureURL() {
+  const input = document.getElementById('structure-url');
+  if (!input) return;
+
+  const url = input.value.trim();
+  if (!url) {
+    alert('Veuillez renseigner une URL de structure.');
+    return;
+  }
+
+  try {
+    new URL(url);
+  } catch (error) {
+    alert('URL de structure invalide.');
+    return;
+  }
+
+  CSV_URL = url;
+  localStorage.setItem(STRUCTURE_URL_STORAGE_KEY, CSV_URL);
+  loadStructure(CSV_URL);
+}
+
+function normalizeRestoredStructureLabels(structure) {
+  const playableLevels = structure.filter(level => !level.isPause);
+  const savedRounds = playableLevels.map(level => String(level.round ?? '').trim());
+  const hasInvalidRoundSequence = savedRounds.some((round, index) => {
+    return !/^\d+$/.test(round) || Number(round) !== index + 1;
+  });
+  let levelNumber = 1;
+  return structure.map(level => {
+    if (level.isPause) {
+      level.round = '';
+    } else if (hasInvalidRoundSequence) {
+      level.round = String(levelNumber);
+    } else if (level.round === undefined || level.round === null || !/^\d+$/.test(String(level.round).trim())) {
+      level.round = levelNumber;
+    }
+    if (level.comment === undefined) {
+      const oldLabel = level.label || '';
+      level.comment = /^Niveau \d+$/.test(oldLabel) || oldLabel === 'BREAK' ? '' : oldLabel;
+    }
+    if (level.isPause) {
+      if (!level.label) level.label = 'BREAK';
+      return level;
+    }
+
+    // Migrate structures created before level labels were kept individually.
+    if (!level.label || level.label === 'Niveau 1') {
+      level.label = `Niveau ${levelNumber}`;
+    }
+    levelNumber++;
+    return level;
+  });
+}
+
+function initializeStructureURLInput() {
+  const input = document.getElementById('structure-url');
+  if (input) input.value = CSV_URL;
 }
 
 function updateDisplay() {
     // 1. Déterminer les informations actuelles et suivantes
     const current = levels[currentLevel];
     const next = levels[currentLevel + 1];
+  if (!current) {
+    const levelElem = document.getElementById('level');
+    const timerElem = document.getElementById('timer');
+    if (levelElem) levelElem.textContent = 'Chargement de la structure...';
+    if (timerElem) timerElem.textContent = '--:--';
+    return;
+  }
     
     // 2. Formatage du temps
     const minutes = Math.floor(timeLeft / 60).toString().padStart(2, '0');
@@ -379,12 +480,28 @@ function updateDisplay() {
     if (timerElem) {
         timerElem.textContent = `${minutes}:${seconds}`;
     }
+    updateStructureStartDisplays();
+    updateStructureRowStates();
 
     // Vérification de l'élément 'level'
     const levelElem = document.getElementById('level');
     if (levelElem) {
-        levelElem.textContent = current.label;
+        let displayRound = current.round;
+        for (let index = currentLevel - 1; !displayRound && index >= 0; index--) {
+            if (!levels[index].isPause && levels[index].round) displayRound = levels[index].round;
+        }
+        levelElem.textContent = `Niveau ${displayRound || currentLevel + 1}`;
     }
+
+    const roundCommentElem = document.getElementById('round-comment');
+    const roundCommentTextElem = document.getElementById('round-comment-text');
+      roundCommentTextElem.textContent = current.comment || '';
+/*
+    if (roundCommentElem && roundCommentTextElem) {
+      roundCommentTextElem.textContent = current.comment || '';
+      roundCommentElem.style.display = current.comment ? 'block' : 'none';
+    }
+*/
 
     // Affichage ou masquage des blinds/ante selon le type de niveau
     const blindsInfoDiv = document.getElementById('blinds-info');
@@ -443,6 +560,10 @@ function updateDisplay() {
     if (structureTitleElem) {
         structureTitleElem.textContent = structureTitle;
     }
+    const structureTitleEditor = document.getElementById('structure-title-editor');
+    if (structureTitleEditor) {
+      structureTitleEditor.value = structureTitleEditor.value || structureTitle;
+    }
 
     // Appel à la mise à jour des stats dans l'autre colonne
     updatePlayerStatusDisplay(); 
@@ -460,6 +581,9 @@ function nextLevel() {
   if (currentLevel < levels.length - 1) {
     currentLevel++;
     timeLeft = levels[currentLevel].duration;
+    actualLevelStartTimes[currentLevel] = Date.now();
+    actualLevelStartTimes.length = currentLevel + 1;
+    futureScheduleDelayMs = 0;
 //    stopTimer();
     updateDisplay();
   }
@@ -469,6 +593,9 @@ function prevLevel() {
   if (currentLevel > 0) {
     currentLevel--;
     timeLeft = levels[currentLevel].duration;
+    actualLevelStartTimes[currentLevel] = Date.now();
+    actualLevelStartTimes.length = currentLevel + 1;
+    futureScheduleDelayMs = 0;
     stopTimer();
     updateDisplay();
   }
@@ -501,6 +628,19 @@ function toggleTimer() {
 
 function startTimer() {
   if (!running) {
+    const now = Date.now();
+    if (!tournamentStartedAt) {
+      tournamentStartedAt = now;
+      actualLevelStartTimes[currentLevel] = now;
+    } else if (pauseStartedAt) {
+      const pauseDuration = now - pauseStartedAt;
+      futureScheduleDelayMs += pauseDuration;
+      for (let index = currentLevel + 1; index < actualLevelStartTimes.length; index++) {
+        if (actualLevelStartTimes[index]) actualLevelStartTimes[index] += pauseDuration;
+      }
+      pauseStartedAt = null;
+    }
+    if (!actualLevelStartTimes[currentLevel]) actualLevelStartTimes[currentLevel] = now;
     running = true;
     timerInterval = setInterval(() => {
       if (timeLeft > 0) {
@@ -528,6 +668,7 @@ function startTimer() {
 function stopTimer() {
     if (!running) return;
 
+  pauseStartedAt = Date.now();
     running = false;
     clearInterval(timerInterval);
     timerInterval = null;
@@ -612,6 +753,10 @@ function resetAll() {
   currentLevel = 0;
   timeLeft = levels[0]?.duration || 0;
   running = false;
+  tournamentStartedAt = null;
+  actualLevelStartTimes = [];
+  pauseStartedAt = null;
+  futureScheduleDelayMs = 0;
   clearInterval(timerInterval);
 
   // 2. Réinitialise la sélection des joueurs
@@ -637,7 +782,13 @@ function showTab(tab) {
   document.querySelector(`.tab-btn[onclick="showTab('${tab}')"]`).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'structure') {
-    loadStructure();
+    initializeStructureURLInput();
+    if (!levels.length) {
+      loadStructure();
+    } else {
+      renderStructureTable();
+      updateStructureRowStates();
+    }
   }
   if (tab === 'joueurs') {
     importPlayersCSV();
@@ -694,7 +845,12 @@ function resetTournoi() {
   currentLevel = 0;
   timeLeft = levels[0]?.duration || 0;
   running = false;
+  tournamentStartedAt = null;
+  actualLevelStartTimes = [];
+  pauseStartedAt = null;
+  futureScheduleDelayMs = 0;
   updateDisplay();
+  exportAppToJSON();
 }
 
 /**
@@ -765,21 +921,366 @@ function renderStructureTable() {
       return;
   }
 
-  let html = '<table id="structure-table"><thead><tr><th>#</th><th>Type</th><th>Blinds</th><th>Ante</th><th>Durée</th></tr></thead><tbody>';
+  let html = '<table id="structure-table"><thead><tr><th>Round</th><th>Commentaire</th><th>Blinds / Break</th><th>Ante</th><th>Durée (min)</th><th>Début</th><th>Action</th></tr></thead><tbody>';
+  const totalStackInPlay = getTotalStackForRegisteredPlayers();
+  let elapsedMinutes = 0;
   levels.forEach((lvl, idx) => {
-    // La fonction formatTime est déjà définie pour formatter la durée
-    const durationDisplay = formatTime(lvl.duration); 
-    
-    if (lvl.isPause) {
-      html += `<tr class="pause-row"><td>${idx + 1}</td><td>Break</td><td colspan="2"></td><td>${durationDisplay}</td></tr>`;
-    } else {
-      html += `<tr><td>${idx + 1}</td><td>${lvl.label}</td><td>${lvl.blinds}</td><td>${lvl.ante || '-'}</td><td>${durationDisplay}</td></tr>`;
-    }
+    const durationMinutes = toSafeNumber(lvl.duration / 60, 0);
+    const round = lvl.round ?? '';
+    const comment = lvl.comment ?? '';
+    const roundCell = lvl.isPause ? '' : escapeStructureHtml(round);
+    const roundEditor = lvl.isPause
+      ? ''
+      : `<input type="text" data-structure-field="round" value="${escapeStructureHtml(round)}" disabled hidden>`;
+    const [smallBlind = '', bigBlind = ''] = String(lvl.blinds || '').split('/').map(value => value.trim());
+    const ante = String(lvl.ante || '').replace(/^Ante:\s*/i, '');
+    const startDisplay = getStructureStartDisplay(idx, elapsedMinutes);
+    const currentBigBlind = getStructureBigBlind(idx);
+    const lowStack = totalStackInPlay !== null && currentBigBlind > 0 && totalStackInPlay / currentBigBlind < 20;
+    const rowClasses = [
+      lvl.isPause ? 'pause-row' : '',
+      lowStack ? 'low-stack-row' : '',
+      idx === currentLevel ? 'current-structure-row' : ''
+    ].filter(Boolean).join(' ');
+    const rowClass = rowClasses ? ` class="${rowClasses}"` : '';
+    const blindsCell = lvl.isPause ? '<span>BREAK</span>' : `<span data-structure-display="blinds">${escapeStructureHtml(lvl.blinds || '')}</span>
+        <span data-structure-editor="blinds" hidden>
+          <input type="number" min="0" data-structure-field="smallBlind" value="${numericInputValue(smallBlind)}" disabled hidden style="width:5em"> /
+          <input type="number" min="0" data-structure-field="bigBlind" value="${numericInputValue(bigBlind)}" disabled hidden style="width:5em">
+        </span>`;
+    const anteCell = lvl.isPause ? '-' : `<span data-structure-display="ante">${escapeStructureHtml(lvl.ante || '-')}</span>
+        <input type="number" min="0" data-structure-field="ante" value="${numericInputValue(ante)}" disabled hidden>`;
+    html += `<tr${rowClass} draggable="true" data-structure-index="${idx}"
+      ondragstart="onStructureDragStart(event)" ondragover="onStructureDragOver(event)" ondrop="onStructureDrop(event)" ondragend="onStructureDragEnd(event)">
+      <td class="structure-drag-handle" title="Déplacer">
+        <span data-structure-display="round">${roundCell}</span>
+        ${roundEditor}
+      </td>
+      <td>
+        <span data-structure-display="comment">${escapeStructureHtml(comment || '-')}</span>
+        <input type="text" data-structure-field="comment" value="${escapeStructureHtml(comment)}" disabled hidden placeholder="Commentaire facultatif">
+      </td>
+      <td>${blindsCell}</td>
+      <td>${anteCell}</td>
+      <td>
+        <span data-structure-display="duration">${durationMinutes}</span>
+        <input type="number" min="1" data-structure-field="duration" value="${numericInputValue(durationMinutes)}" disabled hidden>
+      </td>
+      <td data-structure-start-index="${idx}" class="${startDisplay.className}">${startDisplay.text}</td>
+      <td>
+        <button onclick="toggleStructureEdit(event, ${idx})">Modifier</button>
+        <button onclick="insertStructureLevel(false, ${idx})">+ Niveau</button>
+        <button onclick="insertStructureLevel(true, ${idx})">+ Break</button>
+        <button onclick="removeStructureLevel(${idx})">Supprimer</button>
+      </td>
+    </tr>`;
+    elapsedMinutes += durationMinutes;
   });
   html += '</tbody></table>';
   
   // Injection dans le conteneur sécurisé
   container.innerHTML = html;
+  container.querySelectorAll('[data-structure-field]').forEach(field => {
+    field.addEventListener('input', () => saveStructureEdits(false));
+  });
+}
+
+function toSafeNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function numericInputValue(value) {
+  const match = String(value ?? '').replace(',', '.').match(/-?\d+(?:\.\d+)?/);
+  return match ? escapeStructureHtml(match[0]) : '';
+}
+
+function getAverageStackInPlay() {
+  const isActive = player => player.actif === true || player.actif === 'true' || player.actif === 1;
+  const isStillInPlay = player => {
+    const rank = Number(player.rank);
+    return !Number.isFinite(rank) || rank <= 0;
+  };
+  const registeredPlayers = classementData.filter(isActive).length;
+  const playersInPlay = classementData.filter(player => isActive(player) && isStillInPlay(player)).length;
+  if (!registeredPlayers || !playersInPlay) return null;
+  return (registeredPlayers * (Number(startingStack) || 0)) / playersInPlay;
+}
+
+function getTotalStackForRegisteredPlayers() {
+  const isActive = player => player.actif === true || player.actif === 'true' || player.actif === 1;
+  const registeredPlayers = classementData.filter(isActive).length;
+  if (!registeredPlayers) return null;
+  return registeredPlayers * (Number(startingStack) || 0);
+}
+
+function getStructureBigBlind(index) {
+  for (let currentIndex = index; currentIndex >= 0; currentIndex--) {
+    const level = levels[currentIndex];
+    if (!level || level.isPause) continue;
+    const bigBlind = parseInt(String(level.blinds || '').split('/')[1], 10);
+    if (Number.isFinite(bigBlind) && bigBlind > 0) return bigBlind;
+  }
+  return 0;
+}
+
+function getStructureStartDisplay(index, offsetMinutes) {
+  if (tournamentStartedAt) {
+    const actualStart = getActualLevelStartTimestamp(index, offsetMinutes);
+    const startDate = new Date(actualStart);
+    return {
+      text: `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
+      className: ''
+    };
+  }
+
+  return {
+    text: formatElapsedStructureTime(offsetMinutes),
+    className: 'structure-relative-time'
+  };
+}
+
+function updateStructureStartDisplays() {
+  const cells = document.querySelectorAll('#structure-table td[data-structure-start-index]');
+  if (!cells.length) return;
+
+  let elapsedMinutes = 0;
+  levels.forEach((level, index) => {
+    const cell = document.querySelector(`#structure-table td[data-structure-start-index="${index}"]`);
+    if (cell) {
+      const display = getStructureStartDisplay(index, elapsedMinutes);
+      cell.textContent = display.text;
+      cell.classList.toggle('structure-relative-time', display.className === 'structure-relative-time');
+    }
+    elapsedMinutes += Math.round((level.duration || 0) / 60);
+  });
+}
+
+function updateStructureRowStates() {
+  const rows = document.querySelectorAll('#structure-table tbody tr[data-structure-index]');
+  if (!rows.length) return;
+
+  const totalStackInPlay = getTotalStackForRegisteredPlayers();
+  rows.forEach(row => {
+    const index = Number(row.dataset.structureIndex);
+    const currentBigBlind = getStructureBigBlind(index);
+    const lowStack = totalStackInPlay !== null && currentBigBlind > 0 && totalStackInPlay / currentBigBlind < 20;
+    row.classList.remove('low-stack-row');
+    if (lowStack) row.classList.add('low-stack-row');
+    row.classList.toggle('current-structure-row', index === currentLevel);
+  });
+}
+
+function refreshStructureRows() {
+  if (!document.getElementById('structure-table-container')) return;
+  renderStructureTable();
+  updateStructureRowStates();
+}
+
+function getActualLevelStartTimestamp(index, fallbackOffsetMinutes) {
+  if (actualLevelStartTimes[index]) return actualLevelStartTimes[index];
+
+  let baseIndex = -1;
+  for (let currentIndex = index - 1; currentIndex >= 0; currentIndex--) {
+    if (actualLevelStartTimes[currentIndex]) {
+      baseIndex = currentIndex;
+      break;
+    }
+  }
+
+  if (baseIndex >= 0) {
+    let timestamp = actualLevelStartTimes[baseIndex];
+    for (let currentIndex = baseIndex; currentIndex < index; currentIndex++) {
+      timestamp += (levels[currentIndex].duration || 0) * 1000;
+    }
+    if (baseIndex === currentLevel) {
+      timestamp += futureScheduleDelayMs;
+      if (pauseStartedAt) timestamp += Date.now() - pauseStartedAt;
+    }
+    return timestamp;
+  }
+
+  return tournamentStartedAt + (fallbackOffsetMinutes * 60 * 1000);
+}
+
+function formatElapsedStructureTime(totalMinutes) {
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+}
+
+function formatStructureStartTime(offsetMinutes) {
+  const [hours = 0, minutes = 0] = String(structureStartTime || '20:00').split(':').map(Number);
+  const totalMinutes = (hours * 60) + minutes + offsetMinutes;
+  const normalizedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+  return `${String(Math.floor(normalizedMinutes / 60)).padStart(2, '0')}:${String(normalizedMinutes % 60).padStart(2, '0')}`;
+}
+
+function escapeStructureHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
+function toggleStructureEdit(event, index) {
+  event.stopPropagation();
+  const row = document.querySelector(`#structure-table tbody tr[data-structure-index="${index}"]`);
+  if (!row) return;
+  const editing = row.classList.toggle('structure-editing');
+  row.querySelectorAll('[data-structure-field]').forEach(field => {
+    field.disabled = !editing;
+    field.hidden = !editing;
+  });
+  row.querySelectorAll('[data-structure-display]').forEach(display => { display.hidden = editing; });
+  row.querySelectorAll('[data-structure-editor]').forEach(editor => { editor.hidden = !editing; });
+  event.currentTarget.textContent = editing ? 'Terminer' : 'Modifier';
+  if (editing) row.querySelector('[data-structure-field="comment"]')?.focus();
+  else {
+    saveStructureRow(row, index);
+    exportAppToJSON();
+    renderStructureTable();
+    updateDisplay();
+  }
+}
+
+function onStructureDragStart(event) {
+  if (event.target.closest('button, input')) {
+    event.preventDefault();
+    return;
+  }
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', event.currentTarget.dataset.structureIndex);
+  event.currentTarget.classList.add('structure-dragging');
+}
+
+function onStructureDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('structure-drag-over');
+}
+
+function onStructureDragEnd(event) {
+  event.currentTarget.classList.remove('structure-dragging');
+  document.querySelectorAll('.structure-drag-over').forEach(row => row.classList.remove('structure-drag-over'));
+}
+
+function onStructureDrop(event) {
+  event.preventDefault();
+  const fromIndex = Number(event.dataTransfer.getData('text/plain'));
+  const toIndex = Number(event.currentTarget.dataset.structureIndex);
+  if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) {
+    onStructureDragEnd(event);
+    return;
+  }
+
+  saveStructureEdits(false);
+  const currentLevelObject = levels[currentLevel];
+  const [movedLevel] = levels.splice(fromIndex, 1);
+  levels.splice(toIndex, 0, movedLevel);
+  currentLevel = Math.max(0, levels.indexOf(currentLevelObject));
+  exportAppToJSON();
+  renderStructureTable();
+  updateDisplay();
+}
+
+function addStructureLevel(isPause) {
+  insertStructureLevel(isPause, levels.length - 1);
+}
+
+function insertStructureLevel(isPause, afterIndex) {
+  saveStructureEdits();
+
+  const insertIndex = Math.max(0, Math.min(levels.length, afterIndex + 1));
+  const previousLevel = levels[insertIndex - 1];
+  const previousBigBlind = previousLevel && !previousLevel.isPause
+    ? parseInt(String(previousLevel.blinds).split('/')[1], 10)
+    : 0;
+  const smallBlind = previousBigBlind > 0 ? previousBigBlind : 25;
+  const bigBlind = smallBlind * 2;
+
+  const newLevel = isPause ? {
+    round: previousLevel?.round || '',
+    comment: '',
+    label: 'BREAK',
+    blinds: '-',
+    ante: '',
+    duration: 10 * 60,
+    isPause: true
+  } : {
+    round: previousLevel?.round || '',
+    comment: '',
+    label: `Niveau ${insertIndex + 1}`,
+    blinds: `${smallBlind} / ${bigBlind}`,
+    ante: '',
+    duration: 15 * 60,
+    isPause: false
+  };
+
+  levels.splice(insertIndex, 0, newLevel);
+  // Preserve the same current level when an item is inserted before it.
+  if (insertIndex <= currentLevel && levels.length > 1) {
+    currentLevel++;
+  }
+
+  exportAppToJSON();
+  renderStructureTable();
+  updateDisplay();
+}
+
+function removeStructureLevel(index) {
+  if (!levels[index]) return;
+  if (levels.length <= 1) {
+    alert('La structure doit conserver au moins un niveau ou un break.');
+    return;
+  }
+  if (!window.confirm(`Supprimer le niveau ${index + 1} ?`)) return;
+
+  saveStructureEdits();
+  levels.splice(index, 1);
+  currentLevel = Math.min(currentLevel, Math.max(0, levels.length - 1));
+  timeLeft = levels[currentLevel]?.duration || 0;
+  exportAppToJSON();
+  renderStructureTable();
+  updateDisplay();
+}
+
+function saveStructureEdits(refresh = true) {
+  const rows = document.querySelectorAll('#structure-table tbody tr[data-structure-index]');
+  if (!rows.length) return;
+
+  rows.forEach(row => {
+    const index = Number(row.dataset.structureIndex);
+    saveStructureRow(row, index);
+  });
+
+  exportAppToJSON();
+  updateStructureRowStates();
+  if (refresh) {
+    renderStructureTable();
+    updateDisplay();
+    updateStructureRowStates();
+  }
+}
+
+function saveStructureRow(row, index) {
+  const level = levels[index];
+  if (!level) return;
+
+  const readValue = field => row.querySelector(`[data-structure-field="${field}"]`)?.value.trim() || '';
+  const round = readValue('round');
+  const comment = readValue('comment');
+  level.round = round;
+  level.comment = comment;
+  level.label = comment || (level.isPause ? 'BREAK' : `Niveau ${round || index + 1}`);
+  const durationMinutes = parseInt(readValue('duration'), 10);
+  if (Number.isFinite(durationMinutes) && durationMinutes > 0) {
+    level.duration = durationMinutes * 60;
+  }
+
+  if (!level.isPause) {
+    const smallBlind = readValue('smallBlind');
+    const bigBlind = readValue('bigBlind');
+    const ante = readValue('ante');
+    level.blinds = `${smallBlind} / ${bigBlind}`;
+    level.ante = ante && parseInt(ante, 10) > 0 ? `Ante: ${ante}` : '';
+  }
 }
 
 function sortClassement(column) {
@@ -1041,6 +1542,8 @@ function toggleActif(mpla) {
     // 4. Mettre à jour l'affichage et sauvegarder
     renderClassement();
     renderTablesPlan(); // Mise à jour du plan de tables
+    updateDisplay();
+    refreshStructureRows();
     exportAppToJSON();
 }
 
@@ -1639,7 +2142,7 @@ function restoreAppFromLocalStorage() {
     console.log(appState);
 */
     // Structure
-    if (appState.levels) levels = appState.levels;
+    if (appState.levels) levels = normalizeRestoredStructureLabels(appState.levels);
 /*
     console.log("restoring levels ...");
     console.log(levels);
@@ -1649,6 +2152,10 @@ function restoreAppFromLocalStorage() {
       stopTimer();
       currentLevel = appState.horloge.currentLevel ?? 0;
       timeLeft = appState.horloge.timeLeft ?? 0;
+      tournamentStartedAt = appState.horloge.tournamentStartedAt ?? null;
+      actualLevelStartTimes = appState.horloge.actualLevelStartTimes || [];
+      pauseStartedAt = appState.horloge.pauseStartedAt ?? null;
+      futureScheduleDelayMs = appState.horloge.futureScheduleDelayMs ?? 0;
       baseFontSize = appState.horloge.baseFontSize ?? 2;
       running = !!appState.horloge.running;
       applyFontSizes();
@@ -1681,6 +2188,9 @@ function restoreAppFromLocalStorage() {
       const titleElem = document.getElementById('structure-title');
       if (titleElem) titleElem.textContent = appState.structureTitle;
       structureTitle = appState.structureTitle;
+    }
+    if (appState.structureStartTime) {
+      structureStartTime = appState.structureStartTime;
     }
 /*
     console.log("restoring structureTitle ...");
@@ -1715,9 +2225,14 @@ function exportAppToJSON() {
             currentLevel: currentLevel,
             timeLeft: timeLeft,
             running: running,
+            tournamentStartedAt: tournamentStartedAt,
+            actualLevelStartTimes: actualLevelStartTimes,
+            pauseStartedAt: pauseStartedAt,
+            futureScheduleDelayMs: futureScheduleDelayMs,
             baseFontSize: baseFontSize, 
         },
         structureTitle: structureTitle,
+        structureStartTime: structureStartTime,
         playerAssignments: playerAssignments,
         classementData: classementData,
         currentRank: currentRank, 
@@ -1766,6 +2281,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================
   // Tente de charger l'état depuis localStorage
   restoreAppFromLocalStorage();
+
+  // Sur une installation neuve, charger automatiquement la structure CSV par défaut.
+  if (!levels.length) {
+    loadStructure(CSV_URL);
+  }
     
   // S'assurer que le script ne tente de lier l'écouteur que si l'élément existe
   const startingStackInput = document.getElementById('starting-stack');
@@ -1787,6 +2307,7 @@ document.getElementById('edit-title-btn').addEventListener('click', function() {
   const titleElem = document.getElementById('structure-title');
   const currentTitle = titleElem.textContent;
   const input = document.createElement('input');
+  input.id = 'structure-title-editor';
   input.type = 'text';
   input.value = currentTitle;
   input.style.fontSize = '1.2em';
@@ -1796,15 +2317,21 @@ document.getElementById('edit-title-btn').addEventListener('click', function() {
   // Remplace le titre par l'input
   titleElem.replaceWith(input);
   input.focus();
+  input.addEventListener('input', function() {
+    structureTitle = input.value.trim() || 'Structure Tournoi';
+    exportAppToJSON();
+  });
 
   // Fonction pour valider la modification
   function saveTitle() {
     const newTitle = input.value.trim() || 'Structure Tournoi';
+    structureTitle = newTitle;
     const newTitleElem = document.createElement('h1');
     newTitleElem.id = 'structure-title';
     newTitleElem.style.display = 'inline';
     newTitleElem.textContent = newTitle;
     input.replaceWith(newTitleElem);
+    exportAppToJSON();
     // Remettre l'écouteur sur le nouveau h1
     document.getElementById('edit-title-btn').disabled = false;
   }
