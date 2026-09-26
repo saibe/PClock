@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestion du Championnat</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="championship.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="championship.js" defer></script>
+</head>
+<body>
+    <div class="container championship-page">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <button onclick="window.location.href='index.html'" style="background: #555; color: white; margin-bottom: 10px;">
+                    <i class="fas fa-arrow-left"></i> Retour à la salle
+                </button>
+                <h1 id="championshipTitle">Chargement...</h1>
+            </div>
+            <div id="roomBadge" style="background: chocolate; padding: 10px; border-radius: 8px; color: white;">
+                Salle : <span id="roomNameDisplay">-</span>
+            </div>
+        </header>
+
+        <section class="championship-ranking-section" aria-labelledby="championship-ranking-title">
+            <div class="championship-action-banner">
+                <div class="championship-action-banner-title">
+                    <h2 id="championship-ranking-title">Classement du championnat</h2>
+                    <span id="championshipPlayerCount" aria-label="Nombre de joueurs">0</span>
+                </div>
+                <div class="championship-player-actions">
+                    <button type="button" onclick="openAddPlayerDialog()">
+                        <i class="fas fa-user-plus" aria-hidden="true"></i> Ajouter un joueur
+                    </button>
+                    <button type="button" onclick="openPlayerImportDialog()">
+                        <i class="fas fa-file-import" aria-hidden="true"></i> Importer des joueurs
+                    </button>
+                    <button type="button" class="import-room-members-button" onclick="importAllRoomMembersIntoChampionship()">
+                        <i class="fas fa-users" aria-hidden="true"></i> Importer les membres de la room
+                    </button>
+                    <button type="button" class="new-championship-tournament-button" onclick="createNewTournament()">
+                        <i class="fas fa-trophy" aria-hidden="true"></i> Nouveau tournoi
+                    </button>
+                </div>
+            </div>
+            <p id="championship-players-status" role="status" aria-live="polite"></p>
+            <div class="championship-players-table-wrap">
+                <table class="ranking-table">
+                    <thead id="championshipPlayersHead"></thead>
+                    <tbody id="championshipPlayersList"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </div>
+
+    <dialog id="add-player-dialog" aria-labelledby="add-player-title">
+        <div class="player-import-header">
+            <h2 id="add-player-title">Ajouter un joueur</h2>
+            <button type="button" class="player-import-close" onclick="closeAddPlayerDialog()" aria-label="Fermer">&times;</button>
+        </div>
+        <form id="add-player-form" class="player-import-panel" onsubmit="addPlayerIdentity(event)">
+            <label for="new-player-firstname">Prénom</label>
+            <input id="new-player-firstname" name="firstname" type="text" autocomplete="given-name" required>
+            <label for="new-player-mpla">Pseudo MPLA</label>
+            <input id="new-player-mpla" name="mpla" type="text" autocomplete="username" required>
+            <label for="new-player-winamax">Pseudo Winamax (facultatif)</label>
+            <input id="new-player-winamax" name="winamax" type="text">
+            <p id="add-player-status" role="status" aria-live="polite"></p>
+            <button type="submit">Ajouter au championnat</button>
+        </form>
+    </dialog>
+
+    <dialog id="player-import-dialog" aria-labelledby="player-import-title">
+        <div class="player-import-header">
+            <h2 id="player-import-title">Importer des joueurs au championnat</h2>
+            <button type="button" class="player-import-close" onclick="closePlayerImportDialog()" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="player-import-tabs" role="tablist" aria-label="Source d'importation">
+            <button type="button" id="import-file-tab" class="active" role="tab" aria-selected="true" onclick="showPlayerImportSource('file')">Fichier CSV</button>
+            <button type="button" id="import-url-tab" role="tab" aria-selected="false" onclick="showPlayerImportSource('url')">Lien Internet</button>
+        </div>
+        <section id="import-file-panel" class="player-import-panel" role="tabpanel" aria-labelledby="import-file-tab">
+            <label for="player-import-file">Fichier CSV ou TSV</label>
+            <input id="player-import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values">
+            <button type="button" onclick="loadPlayersFromFile()">Charger le fichier</button>
+        </section>
+        <section id="import-url-panel" class="player-import-panel" role="tabpanel" aria-labelledby="import-url-tab" hidden>
+            <label for="player-import-url">URL d'un CSV ou d'une Google Sheet</label>
+            <input id="player-import-url" type="url" placeholder="https://docs.google.com/spreadsheets/..." autocomplete="url">
+            <button type="button" onclick="loadPlayersFromUrl()">Charger le lien</button>
+        </section>
+        <section id="player-column-mapping" class="player-import-panel" hidden>
+            <p>Associez les colonnes du fichier aux champs du joueur.</p>
+            <label for="player-firstname-column">Prénom</label>
+            <select id="player-firstname-column"></select>
+            <label for="player-mpla-column">MPLA</label>
+            <select id="player-mpla-column"></select>
+            <label for="player-winamax-column">Winamax</label>
+            <select id="player-winamax-column"></select>
+            <label class="player-header-toggle">
+                <input id="player-import-has-header" type="checkbox" checked>
+                La première ligne contient les noms des colonnes
+            </label>
+            <button type="button" onclick="importMappedChampionshipPlayers()">Importer les joueurs</button>
+        </section>
+        <p id="player-import-status" role="status" aria-live="polite"></p>
+    </dialog>
+
+</body>
+</html>

@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Gestion de Championnat de Poker</title>
-    <link   rel="stylesheet" href="style.css"> 
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="championship.css">
     <link   rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="room.js"    defer></script>
+    <script src="room-members.js" defer></script>
 </head>
 <body>
     
@@ -34,6 +36,36 @@
                     <div class="title" id="roomTitle"></div>
                     <div class="datetime" id="roomMetadata"></div>
                 </header>
+
+                <section class="room-members-section" aria-labelledby="room-members-title">
+                    <div class="room-members-heading">
+                        <h2 id="room-members-title">Membres de la room <span id="roomMembersCount">0</span></h2>
+                        <div class="room-members-actions">
+                            <button type="button" onclick="addRoomMember()" title="Ajouter un membre">
+                                <i class="fas fa-user-plus" aria-hidden="true"></i> Ajouter
+                            </button>
+                            <button type="button" onclick="openRoomMembersImportDialog()" title="Importer des membres">
+                                <i class="fas fa-file-import" aria-hidden="true"></i> Importer
+                            </button>
+                        </div>
+                    </div>
+                    <details class="room-members-details">
+                        <summary>Afficher la liste des membres</summary>
+                        <div class="room-members-table-wrap">
+                            <table id="room-members-table" class="ranking-table">
+                                <thead>
+                                    <tr>
+                                        <th>Prénom</th>
+                                        <th>MPLA</th>
+                                        <th>Winamax</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="roomMembersList"></tbody>
+                            </table>
+                        </div>
+                    </details>
+                </section>
 
                 <div class="action-box controls" style="margin-bottom: 20px; padding: 15px;">
                     <h3>Championnats</h3>
@@ -93,11 +125,48 @@
         <div class="container-R">
             <h2>Statistiques Room</h2>
             <p>Salle sélectionnée : <strong id="selectedRoomNameR">N/A</strong></p>
+            <p>Membres : <span id="totalRoomMembersR">0</span></p>
             <p>Total Championnats : <span id="totalChampionshipsR">0</span></p>
             <p>Total Tournois (simples) : <span id="totalTournamentsR">0</span></p>
         </div>
         
     </div>
+
+    <dialog id="room-members-import-dialog" aria-labelledby="room-members-import-title">
+        <div class="player-import-header">
+            <h2 id="room-members-import-title">Importer des membres</h2>
+            <button type="button" class="player-import-close" onclick="closeRoomMembersImportDialog()" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="player-import-tabs" role="tablist" aria-label="Source d'importation">
+            <button type="button" id="room-import-file-tab" class="active" role="tab" aria-selected="true" onclick="showRoomMembersImportSource('file')">Fichier CSV</button>
+            <button type="button" id="room-import-url-tab" role="tab" aria-selected="false" onclick="showRoomMembersImportSource('url')">Lien Internet</button>
+        </div>
+        <section id="room-import-file-panel" class="player-import-panel" role="tabpanel" aria-labelledby="room-import-file-tab">
+            <label for="room-members-file">Fichier CSV ou TSV</label>
+            <input id="room-members-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values">
+            <button type="button" onclick="loadRoomMembersFromFile()">Charger le fichier</button>
+        </section>
+        <section id="room-import-url-panel" class="player-import-panel" role="tabpanel" aria-labelledby="room-import-url-tab" hidden>
+            <label for="room-members-url">URL d'un CSV ou d'une Google Sheet</label>
+            <input id="room-members-url" type="url" placeholder="https://docs.google.com/spreadsheets/..." autocomplete="url">
+            <button type="button" onclick="loadRoomMembersFromUrl()">Charger le lien</button>
+        </section>
+        <section id="room-members-column-mapping" class="player-import-panel" hidden>
+            <p>Associez les colonnes du fichier aux champs du membre.</p>
+            <label for="room-firstname-column">Prénom</label>
+            <select id="room-firstname-column"></select>
+            <label for="room-mpla-column">MPLA</label>
+            <select id="room-mpla-column"></select>
+            <label for="room-winamax-column">Winamax</label>
+            <select id="room-winamax-column"></select>
+            <label class="player-header-toggle">
+                <input id="room-import-has-header" type="checkbox" checked>
+                La première ligne contient les noms des colonnes
+            </label>
+            <button type="button" onclick="importMappedRoomMembers()">Importer les membres</button>
+        </section>
+        <p id="room-members-import-status" role="status" aria-live="polite"></p>
+    </dialog>
 
 </body>
 </html>

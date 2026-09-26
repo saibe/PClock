@@ -4,6 +4,7 @@ let currentRoomData = null; // L'objet RoomData actuellement sélectionné
 
 const BaseRoomData = {
     roomname: "",
+    members: [],
     championships: [],
     Tournaments: [] 
 };
@@ -15,7 +16,11 @@ const BaseRoomData = {
 
 function loadAllRooms() {
     const data = localStorage.getItem(ROOMS_KEY);
-    return data ? JSON.parse(data) : [];
+    const rooms = data ? JSON.parse(data) : [];
+    rooms.forEach(room => {
+        if (!Array.isArray(room.members)) room.members = [];
+    });
+    return rooms;
 }
 
 function saveAllRooms(rooms) {
@@ -139,6 +144,7 @@ function selectRoom(roomName) {
         
         // 2. Mettre à jour les stats du Container-R
         document.getElementById('selectedRoomNameR').textContent = room.roomname;
+        document.getElementById('totalRoomMembersR').textContent = room.members.length;
         document.getElementById('totalChampionshipsR').textContent = room.championships.length;
         document.getElementById('totalTournamentsR').textContent = room.Tournaments.length;
 
@@ -148,6 +154,7 @@ function selectRoom(roomName) {
         
         // 4. Rendu des listes spécifiques à la Room
         renderChampionshipList();
+        renderRoomMembers();
         renderRoomList(); // Pour mettre en évidence la tile sélectionnée
     }
 }

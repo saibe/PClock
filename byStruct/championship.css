@@ -1,0 +1,288 @@
+#player-import-dialog,
+#add-player-dialog {
+  width: min(92vw, 520px);
+  max-height: 88vh;
+  padding: 1.25rem;
+  border: 1px solid #666;
+  border-radius: 8px;
+  background: #222;
+  color: #fff;
+}
+
+.championship-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 1rem clamp(0.75rem, 2vw, 2rem);
+  box-sizing: border-box;
+}
+
+.championship-ranking-section {
+  width: 100%;
+  min-width: 0;
+  margin-top: 1.25rem;
+}
+
+.championship-action-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #555;
+  background: #202020;
+  box-sizing: border-box;
+}
+
+.championship-action-banner-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.championship-action-banner-title h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.championship-player-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.championship-player-actions button {
+  margin: 0;
+  background: #4caf50;
+}
+
+.championship-player-actions .import-room-members-button {
+  background: #397e83;
+}
+
+.championship-player-actions .new-championship-tournament-button {
+  background: chocolate;
+}
+
+#player-import-dialog::backdrop,
+#add-player-dialog::backdrop {
+  background: #000b;
+}
+
+.player-import-header,
+.player-import-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.player-import-header h2 {
+  margin: 0 0 1rem;
+  font-size: 1.35rem;
+}
+
+.player-import-close {
+  margin: 0 0 1rem;
+  padding: 0.2rem 0.6rem;
+  background: transparent;
+  font-size: 1.5rem;
+}
+
+.player-import-tabs {
+  justify-content: flex-start;
+  border-bottom: 1px solid #555;
+}
+
+.player-import-tabs button {
+  margin: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+.player-import-tabs button.active {
+  background: chocolate;
+}
+
+.player-import-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+.player-import-panel[hidden] {
+  display: none;
+}
+
+.player-import-panel input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.65rem;
+}
+
+#add-player-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.65rem;
+}
+
+#add-player-form button[type="submit"] {
+  justify-self: start;
+  background: #4caf50;
+}
+
+#add-player-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: #ffcc80;
+}
+
+.player-import-panel select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.65rem;
+}
+
+.player-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.player-import-panel button {
+  justify-self: start;
+  background: #4caf50;
+}
+
+#player-import-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: #ffcc80;
+}
+
+.import-room-members-button {
+  margin: 0;
+  background: #4caf50;
+}
+
+#championship-players-status {
+  min-height: 1.4em;
+  color: #ffcc80;
+}
+
+#championshipPlayerCount {
+  color: #bbb;
+  font-size: 0.85em;
+}
+
+.championship-players-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.championship-players-table-wrap table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.championship-players-table-wrap .ranking-table {
+  table-layout: auto;
+}
+
+.championship-players-table-wrap th,
+.championship-players-table-wrap td {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .championship-action-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .championship-player-actions {
+    justify-content: flex-start;
+  }
+
+  .championship-players-table-wrap {
+    overflow-x: auto;
+  }
+}
+
+.championship-player-remove {
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  background: #a83232;
+}
+
+.room-members-section {
+  margin: 1.5rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #555;
+  text-align: left;
+}
+
+.room-members-heading,
+.room-members-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.room-members-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.room-members-heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+#roomMembersCount {
+  color: #bbb;
+  font-size: 0.85em;
+}
+
+.room-members-actions button {
+  margin: 0;
+  background: #4caf50;
+}
+
+.room-members-table-wrap {
+  max-width: 100%;
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.room-members-details > summary {
+  width: fit-content;
+  margin-top: 0.75rem;
+  color: #ffcc80;
+  cursor: pointer;
+}
+
+.room-members-details > summary:focus-visible {
+  outline: 2px solid #ffcc80;
+  outline-offset: 3px;
+}
+
+#room-members-table {
+  min-width: 480px;
+  margin: 0;
+}
+
+#room-members-table td {
+  overflow-wrap: anywhere;
+}
+
+.room-member-delete {
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  background: #a83232;
+}

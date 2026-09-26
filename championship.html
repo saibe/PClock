@@ -26,7 +26,7 @@
                 <h3><i class="fas fa-users"></i> Joueurs du Championnat</h3>
                 <div class="action-box">
                     <button onclick="addPlayerIdentity()"      style="background: #4CAF50;">Ajouter Joueur</button>
-                    <button onclick="addPlayerIdentityList()" style="background: #4CAF50;">Importer Liste Joueurs</button>
+                    <button onclick="openPlayerImportDialog()" style="background: #4CAF50;">Importer Liste Joueurs</button>
                 </div>
                 <ul id="playerList" style="list-style: none; padding: 0; margin-top: 15px;">
                     </ul>
@@ -53,5 +53,27 @@
             </div>
         </div>
     </div>
+
+    <dialog id="player-import-dialog" aria-labelledby="player-import-title">
+        <div class="player-import-header">
+            <h2 id="player-import-title">Importer des joueurs</h2>
+            <button type="button" class="player-import-close" onclick="closePlayerImportDialog()" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="player-import-tabs" role="tablist" aria-label="Source d'importation">
+            <button type="button" id="import-file-tab" class="active" role="tab" aria-selected="true" onclick="showPlayerImportSource('file')">Fichier CSV</button>
+            <button type="button" id="import-url-tab" role="tab" aria-selected="false" onclick="showPlayerImportSource('url')">Lien Internet</button>
+        </div>
+        <section id="import-file-panel" class="player-import-panel" role="tabpanel" aria-labelledby="import-file-tab">
+            <label for="player-import-file">Fichier CSV ou TSV</label>
+            <input id="player-import-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values">
+            <button type="button" onclick="importPlayersFromFile()">Importer le fichier</button>
+        </section>
+        <section id="import-url-panel" class="player-import-panel" role="tabpanel" aria-labelledby="import-url-tab" hidden>
+            <label for="player-import-url">URL d'un CSV ou d'une Google Sheet</label>
+            <input id="player-import-url" type="url" placeholder="https://docs.google.com/spreadsheets/..." autocomplete="url">
+            <button type="button" onclick="importPlayersFromUrl()">Charger et importer</button>
+        </section>
+        <p id="player-import-status" role="status" aria-live="polite"></p>
+    </dialog>
 </body>
 </html>
