@@ -1,5 +1,6 @@
 #player-import-dialog,
-#add-player-dialog {
+#add-player-dialog,
+#new-tournament-dialog {
   width: min(92vw, 520px);
   max-height: 88vh;
   padding: 1.25rem;
@@ -68,7 +69,8 @@
 }
 
 #player-import-dialog::backdrop,
-#add-player-dialog::backdrop {
+#add-player-dialog::backdrop,
+#new-tournament-dialog::backdrop {
   background: #000b;
 }
 
@@ -128,6 +130,32 @@
   width: 100%;
   min-width: 0;
   padding: 0.65rem;
+}
+
+#new-tournament-form input,
+#new-tournament-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.65rem;
+  font: inherit;
+}
+
+#new-tournament-form textarea {
+  resize: vertical;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+#new-tournament-form button[type="submit"] {
+  justify-self: start;
+  background: chocolate;
+}
+
+#new-tournament-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: #ffcc80;
 }
 
 #add-player-form button[type="submit"] {
@@ -197,6 +225,15 @@
 .championship-players-table-wrap th,
 .championship-players-table-wrap td {
   white-space: nowrap;
+}
+
+.tournament-date-link {
+  margin: 0;
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  color: #ffcc80;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 @media (max-width: 900px) {

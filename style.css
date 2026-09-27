@@ -9,6 +9,23 @@ body {
   height: 100%;
   margin: 0;
 }
+.selected-tournament-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 0.65em 1em;
+  background: #222;
+  border-bottom: 1px solid #555;
+}
+
+.selected-tournament-context[hidden] {
+  display: none !important;
+}
+
+.selected-tournament-context select {
+  padding: 0.4em;
+}
 .container-L, .container, .container-R {
   background: #333;
 /*  padding: 0em 1em; */

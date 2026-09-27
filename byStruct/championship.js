@@ -35,6 +35,7 @@ const TournamentPlayer = {
 const Tournament = {
   uuid: null,
   date: null,
+  status: 'ready',
   title: '',
   structure: [],
   ptsladder: [],
@@ -111,6 +112,10 @@ const ROOMS_STORAGE_KEY = 'poker_championship_rooms';
     const addDialog = document.getElementById('add-player-dialog');
     addDialog.addEventListener('click', event => {
       if (event.target === addDialog) closeAddPlayerDialog();
+    });
+    const tournamentDialog = document.getElementById('new-tournament-dialog');
+    tournamentDialog.addEventListener('click', event => {
+      if (event.target === tournamentDialog) closeNewTournamentDialog();
     });
   }
 
@@ -397,6 +402,129 @@ const ROOMS_STORAGE_KEY = 'poker_championship_rooms';
     return entry?.player || entry || {};
   }
 
+  function createNewTournament() {
+    if (!selectedRoomData || !selectedChampionshipData) {
+      setChampionshipPlayersStatus('Le championnat courant est introuvable.');
+      return;
+    }
+
+    const tournaments = selectedChampionshipData.tournaments || [];
+    const date = formatDayMonth(new Date());
+    const title = `${selectedRoomData.roomname} - ${selectedChampionshipData.season}T${selectedChampionshipData.quarter} manche #${tournaments.length + 1}`;
+    document.getElementById('new-tournament-date').value = date;
+    document.getElementById('new-tournament-title-input').value = title;
+    document.getElementById('new-tournament-structure').value = JSON.stringify(selectedChampionshipData.structure || [], null, 2);
+    document.getElementById('new-tournament-ptsladder').value = JSON.stringify(selectedChampionshipData.ptsladder || [], null, 2);
+    document.getElementById('new-tournament-status').textContent = '';
+    document.getElementById('new-tournament-form').reset();
+    document.getElementById('new-tournament-date').value = date;
+    document.getElementById('new-tournament-title-input').value = title;
+    document.getElementById('new-tournament-structure').value = JSON.stringify(selectedChampionshipData.structure || [], null, 2);
+    document.getElementById('new-tournament-ptsladder').value = JSON.stringify(selectedChampionshipData.ptsladder || [], null, 2);
+    document.getElementById('new-tournament-dialog').showModal();
+    document.getElementById('new-tournament-date').focus();
+  }
+
+  function closeNewTournamentDialog() {
+    const dialog = document.getElementById('new-tournament-dialog');
+    if (dialog.open) dialog.close();
+  }
+
+  function createChampionshipTournament(event) {
+    event.preventDefault();
+    if (!selectedRoomData || !selectedChampionshipData) {
+      setNewTournamentStatus('Le championnat courant est introuvable.');
+      return;
+    }
+
+    const date = document.getElementById('new-tournament-date').value.trim();
+    const title = document.getElementById('new-tournament-title-input').value.trim();
+    let structure;
+    let ptsladder;
+    try {
+      structure = JSON.parse(document.getElementById('new-tournament-structure').value);
+      ptsladder = JSON.parse(document.getElementById('new-tournament-ptsladder').value);
+    } catch (error) {
+      setNewTournamentStatus('La structure et le barème doivent être des tableaux JSON valides.');
+      return;
+    }
+
+    if (!Array.isArray(structure) || !Array.isArray(ptsladder)) {
+      setNewTournamentStatus('La structure et le barème doivent chacun être un tableau JSON.');
+      return;
+    }
+    if (!structure.length) {
+      setNewTournamentStatus('Ajoutez au moins un niveau à la structure avant de créer ce tournoi.');
+      return;
+    }
+    if (!isValidDayMonth(date)) {
+      setNewTournamentStatus('Saisissez une date valide au format JJ/MM.');
+      return;
+    }
+    if (!title) {
+      setNewTournamentStatus('Le titre du tournoi est obligatoire.');
+      return;
+    }
+
+    const tournamentPlayers = (selectedChampionshipData.players || []).map(entry => ({
+      active: true,
+      player: { ...PlayerIdentity, ...getChampionshipPlayerIdentity(entry) },
+      rank: null,
+      assignment: { table: 0, seat: 0 },
+      score: 0,
+      round: null,
+      killer: null
+    }));
+    const tournament = {
+      uuid: createTournamentUuid(),
+      date,
+      status: 'ready',
+      title,
+      structure,
+      ptsladder,
+      round: 1,
+      clock: structure[0]?.duration || 0,
+      players: tournamentPlayers
+    };
+
+    selectedChampionshipData.tournaments = selectedChampionshipData.tournaments || [];
+    selectedChampionshipData.tournaments.push(tournament);
+    persistSelectedRoom();
+    renderChampionshipPlayers();
+    closeNewTournamentDialog();
+    setChampionshipPlayersStatus(`Tournoi « ${title} » créé. Cliquez sur sa date pour l’ouvrir.`);
+  }
+
+  function setNewTournamentStatus(message) {
+    document.getElementById('new-tournament-status').textContent = message;
+  }
+
+  function createTournamentUuid() {
+    return globalThis.crypto?.randomUUID?.() || `tournament-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function formatDayMonth(date) {
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function isValidDayMonth(value) {
+    const match = String(value).match(/^(\d{2})\/(\d{2})$/);
+    if (!match) return false;
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    return month >= 1 && month <= 12 && day >= 1 && day <= new Date(2024, month, 0).getDate();
+  }
+
+  function openTournament(tournamentUuid) {
+    if (!selectedChampionshipData || !selectedRoomData) return;
+    localStorage.setItem('last_selected_room', selectedRoomData.roomname);
+    const params = new URLSearchParams({
+      championship: String(selectedChampionshipData.uuid),
+      tournament: String(tournamentUuid)
+    });
+    window.location.href = `../index.html?${params.toString()}`;
+  }
+
   function importAllRoomMembersIntoChampionship() {
     if (!selectedRoomData || !selectedChampionshipData) {
       setChampionshipPlayersStatus('Le championnat courant est introuvable.');
@@ -470,8 +598,13 @@ const ROOMS_STORAGE_KEY = 'poker_championship_rooms';
     });
     tournaments.forEach((tournament, index) => {
       const cell = document.createElement('th');
-      cell.textContent = formatChampionshipTournamentDate(tournament.date, index);
-      cell.title = tournament.title || cell.textContent;
+      const dateButton = document.createElement('button');
+      dateButton.type = 'button';
+      dateButton.className = 'tournament-date-link';
+      dateButton.textContent = formatChampionshipTournamentDate(tournament.date, index);
+      dateButton.title = `Ouvrir ${tournament.title || dateButton.textContent}`;
+      dateButton.addEventListener('click', () => openTournament(tournament.uuid));
+      cell.appendChild(dateButton);
       headerRow.appendChild(cell);
     });
     const actionHeader = document.createElement('th');

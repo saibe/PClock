@@ -25,6 +25,19 @@
     <div id="simple-ranking-container"></div>
   </div>
   <div class="container">
+    <div id="selected-tournament-context" hidden class="selected-tournament-context">
+      <div><strong id="selected-tournament-title"></strong> <span id="selected-tournament-status"></span></div>
+      <div style="display:flex; align-items:center; gap:0.5em;">
+        <label for="selected-tournament-status-select">Statut</label>
+        <select id="selected-tournament-status-select" onchange="setSelectedTournamentStatus(this.value)">
+          <option value="ready">ready</option>
+          <option value="running">running</option>
+          <option value="closed">closed</option>
+          <option value="aborted">aborted</option>
+        </select>
+        <a id="return-to-championship" href="byStruct/index.html" style="color:#ffcc80;">Retour au championnat</a>
+      </div>
+    </div>
     <div class="title">
       <h1 id="structure-title" style="display:inline;">Structure Tournoi</h1>
       <button id="edit-title-btn" title="Modifier le titre" style="margin-left:0.5em; font-size:1em; vertical-align:middle; cursor:pointer;">✏️</button>

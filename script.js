@@ -26,6 +26,8 @@ let currentRank = 1;
 let joueurAEliminerMPLA = null;
 let startingStack = 20000;
 let championshipData = null;
+let activeChampionshipTournament = null;
+let resumeSelectedTournament = false;
 
 // Font-size base et ratios
 let baseFontSize = 10; // en em
@@ -586,6 +588,10 @@ function nextLevel() {
     futureScheduleDelayMs = 0;
 //    stopTimer();
     updateDisplay();
+    persistSelectedTournament();
+  } else if (activeChampionshipTournament) {
+    stopTimer();
+    setSelectedTournamentStatus('closed');
   }
 }
 
@@ -642,6 +648,8 @@ function startTimer() {
     }
     if (!actualLevelStartTimes[currentLevel]) actualLevelStartTimes[currentLevel] = now;
     running = true;
+    persistSelectedTournament();
+    updateSelectedTournamentStatusDisplay();
     timerInterval = setInterval(() => {
       if (timeLeft > 0) {
         timeLeft--;
@@ -649,6 +657,7 @@ function startTimer() {
             playMultiToneAlert();
         }
         updateDisplay();
+        persistSelectedTournament();
       } else {
         nextLevel();
       }
@@ -672,6 +681,8 @@ function stopTimer() {
     running = false;
     clearInterval(timerInterval);
     timerInterval = null;
+    persistSelectedTournament();
+    updateSelectedTournamentStatusDisplay();
     updateDisplay();
 
     // Gestion des boutons
@@ -2217,6 +2228,208 @@ function restoreAppFromLocalStorage() {
   }
 }
 
+function loadSelectedChampionshipTournament() {
+  const params = new URLSearchParams(window.location.search);
+  const tournamentUuid = params.get('tournament');
+  const championshipUuid = params.get('championship');
+  if (!tournamentUuid || !championshipUuid) return false;
+
+  let rooms;
+  try {
+    rooms = JSON.parse(localStorage.getItem('poker_championship_rooms') || '[]');
+  } catch (error) {
+    console.error('Impossible de lire les rooms pour charger le tournoi.', error);
+    return false;
+  }
+
+  let selectedRoom;
+  let selectedChampionship;
+  let selectedTournament;
+  for (const room of rooms) {
+    const championship = (room.championships || []).find(item => String(item.uuid) === championshipUuid);
+    const tournament = championship?.tournaments?.find(item => String(item.uuid) === tournamentUuid);
+    if (championship && tournament) {
+      selectedRoom = room;
+      selectedChampionship = championship;
+      selectedTournament = tournament;
+      break;
+    }
+  }
+  if (!selectedTournament) {
+    alert('Ce tournoi est introuvable dans le championnat sélectionné.');
+    return false;
+  }
+
+  activeChampionshipTournament = {
+    roomName: selectedRoom.roomname,
+    championshipUuid,
+    tournamentUuid
+  };
+  selectedTournament.status = ['ready', 'running', 'closed', 'aborted'].includes(selectedTournament.status)
+    ? selectedTournament.status
+    : 'ready';
+  if (Array.isArray(selectedTournament.ptsladder)) POINTS_BAREME_DATA = selectedTournament.ptsladder;
+
+  levels = (selectedTournament.structure || []).map((item, index) => {
+    const isPause = Boolean(item.isBreak ?? item.isPause);
+    const smallBlind = item.small_blind ?? item.smallBlind;
+    const bigBlind = item.big_blind ?? item.bigBlind;
+    const durationValue = Number(item.durationSeconds ?? item.duration ?? 0);
+    const duration = item.durationUnit === 'minutes' || item.durationMinutes !== undefined
+      ? Number(item.durationMinutes ?? item.duration) * 60
+      : durationValue;
+    return {
+      round: item.round ?? (isPause ? '' : String(index + 1)),
+      comment: item.comment || '',
+      label: item.label || (isPause ? 'BREAK' : `Niveau ${item.round ?? index + 1}`),
+      blinds: item.blinds || (isPause ? '-' : `${smallBlind ?? 0} / ${bigBlind ?? 0}`),
+      ante: item.ante ? (typeof item.ante === 'number' ? `Ante: ${item.ante}` : String(item.ante)) : '',
+      duration: Number.isFinite(duration) ? duration : 0,
+      isPause
+    };
+  });
+  levels = normalizeRestoredStructureLabels(levels);
+  currentLevel = Math.max(0, Math.min(levels.length - 1, Number(selectedTournament.round || 1) - 1));
+  timeLeft = Number(selectedTournament.clock ?? levels[currentLevel]?.duration ?? 0);
+  if (!Number.isFinite(timeLeft)) timeLeft = levels[currentLevel]?.duration || 0;
+  structureTitle = selectedTournament.title || `${selectedRoom.roomname} - Tournoi`;
+  tournamentStartedAt = selectedTournament.tournamentStartedAt ?? null;
+  actualLevelStartTimes = selectedTournament.actualLevelStartTimes || [];
+  pauseStartedAt = null;
+  futureScheduleDelayMs = Number(selectedTournament.futureScheduleDelayMs || 0);
+  classementData = (selectedTournament.players || []).map(entry => {
+    const player = entry.player || entry;
+    return {
+      mpla: player.mpla || '',
+      firstname: player.firstname || '',
+      nom: '',
+      winamax: player.winamax || '',
+      rank: entry.rank ?? '',
+      pts: Number(entry.score || 0),
+      actif: entry.active !== false,
+      table: entry.assignment?.table || '',
+      seat: entry.assignment?.seat || '',
+      round: entry.round ?? '',
+      heure: entry.heure || '',
+      killer: entry.killer?.mpla || entry.killer || ''
+    };
+  });
+  playerAssignments = classementData.filter(player => player.table && player.seat).map(player => ({
+    mpla: player.mpla,
+    table: player.table,
+    seat: player.seat
+  }));
+  resumeSelectedTournament = selectedTournament.status === 'running';
+  running = false;
+
+  const titleElement = document.getElementById('structure-title');
+  if (titleElement) titleElement.textContent = structureTitle;
+  const contextElement = document.getElementById('selected-tournament-context');
+  if (contextElement) {
+    contextElement.hidden = false;
+    contextElement.style.display = 'flex';
+    document.getElementById('selected-tournament-title').textContent = structureTitle;
+    document.getElementById('selected-tournament-status').textContent = `(${selectedTournament.status})`;
+    document.getElementById('selected-tournament-status-select').value = selectedTournament.status;
+    document.getElementById('return-to-championship').href = `byStruct/championship.html?uuid=${encodeURIComponent(championshipUuid)}`;
+  }
+
+  return true;
+}
+
+function updateSelectedTournamentStatusDisplay() {
+  if (!activeChampionshipTournament) return;
+  const status = running ? 'running' : getSelectedTournamentStatus();
+  const statusText = document.getElementById('selected-tournament-status');
+  const statusSelect = document.getElementById('selected-tournament-status-select');
+  if (statusText) statusText.textContent = `(${status})`;
+  if (statusSelect) statusSelect.value = status;
+}
+
+function getSelectedTournamentStatus() {
+  if (!activeChampionshipTournament) return 'ready';
+  try {
+    const rooms = JSON.parse(localStorage.getItem('poker_championship_rooms') || '[]');
+    const room = rooms.find(item => item.roomname === activeChampionshipTournament.roomName);
+    const championship = room?.championships?.find(item => String(item.uuid) === activeChampionshipTournament.championshipUuid);
+    const tournament = championship?.tournaments?.find(item => String(item.uuid) === activeChampionshipTournament.tournamentUuid);
+    return tournament?.status || 'ready';
+  } catch (error) {
+    return 'ready';
+  }
+}
+
+function persistSelectedTournament() {
+  if (!activeChampionshipTournament) return;
+  let rooms;
+  try {
+    rooms = JSON.parse(localStorage.getItem('poker_championship_rooms') || '[]');
+  } catch (error) {
+    console.error('Impossible de sauvegarder le tournoi.', error);
+    return;
+  }
+  const room = rooms.find(item => item.roomname === activeChampionshipTournament.roomName);
+  const championship = room?.championships?.find(item => String(item.uuid) === activeChampionshipTournament.championshipUuid);
+  const tournament = championship?.tournaments?.find(item => String(item.uuid) === activeChampionshipTournament.tournamentUuid);
+  if (!tournament) return;
+
+  tournament.title = structureTitle;
+  tournament.status = running ? 'running' : (tournament.status === 'closed' || tournament.status === 'aborted' ? tournament.status : 'ready');
+  tournament.round = currentLevel + 1;
+  tournament.clock = timeLeft;
+  tournament.ptsladder = Array.isArray(POINTS_BAREME_DATA) ? POINTS_BAREME_DATA : tournament.ptsladder;
+  tournament.tournamentStartedAt = tournamentStartedAt;
+  tournament.actualLevelStartTimes = actualLevelStartTimes;
+  tournament.futureScheduleDelayMs = futureScheduleDelayMs;
+  tournament.structure = levels.map(level => {
+    const [smallBlind = '', bigBlind = ''] = String(level.blinds || '').split('/').map(value => value.trim());
+    return {
+      round: level.round,
+      comment: level.comment || '',
+      label: level.label || '',
+      small_blind: Number(smallBlind) || 0,
+      big_blind: Number(bigBlind) || 0,
+      blinds: level.blinds,
+      ante: level.ante || '',
+      duration: level.duration,
+      isBreak: Boolean(level.isPause)
+    };
+  });
+  tournament.players = classementData.map(player => ({
+    active: Boolean(player.actif),
+    player: { firstname: player.firstname || '', mpla: player.mpla || '', winamax: player.winamax || '' },
+    rank: player.rank === '' ? null : player.rank,
+    assignment: { table: player.table || 0, seat: player.seat || 0 },
+    score: Number(player.pts) || 0,
+    round: player.round || null,
+    killer: player.killer ? { mpla: player.killer } : null
+  }));
+  localStorage.setItem('poker_championship_rooms', JSON.stringify(rooms));
+}
+
+function setSelectedTournamentStatus(status) {
+  if (!activeChampionshipTournament || !['ready', 'running', 'closed', 'aborted'].includes(status)) return;
+  if (status === 'running') {
+    if (!running) startTimer();
+    else persistSelectedTournament();
+    updateSelectedTournamentStatusDisplay();
+    return;
+  }
+
+  if (running) stopTimer();
+  try {
+    const rooms = JSON.parse(localStorage.getItem('poker_championship_rooms') || '[]');
+    const room = rooms.find(item => item.roomname === activeChampionshipTournament.roomName);
+    const championship = room?.championships?.find(item => String(item.uuid) === activeChampionshipTournament.championshipUuid);
+    const tournament = championship?.tournaments?.find(item => String(item.uuid) === activeChampionshipTournament.tournamentUuid);
+    if (tournament) tournament.status = status;
+    if (room) localStorage.setItem('poker_championship_rooms', JSON.stringify(rooms));
+  } catch (error) {
+    console.error('Impossible de modifier le statut du tournoi.', error);
+  }
+  updateSelectedTournamentStatusDisplay();
+}
+
 function exportAppToJSON() {
     // Collecte de toutes les données importantes de l'application
     const appData = {
@@ -2245,6 +2458,7 @@ function exportAppToJSON() {
     
     // Sauvegarde dans le stockage local du navigateur
     localStorage.setItem('pokerAppData', jsonString);
+    persistSelectedTournament();
 
     // Note: Si vous souhaitez TOUJOURS conserver l'export fichier pour un backup manuel,
     // ajoutez ici le code de téléchargement de fichier que vous aviez. Sinon, il n'est plus nécessaire.
@@ -2280,7 +2494,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // 1. CHARGEMENT AUTOMATIQUE DE L'ÉTAT (RESTAURATION)
   // =========================================================
   // Tente de charger l'état depuis localStorage
-  restoreAppFromLocalStorage();
+  const selectedTournamentLoaded = loadSelectedChampionshipTournament();
+  if (!selectedTournamentLoaded) restoreAppFromLocalStorage();
 
   // Sur une installation neuve, charger automatiquement la structure CSV par défaut.
   if (!levels.length) {
@@ -2300,6 +2515,7 @@ document.addEventListener('DOMContentLoaded', function() {
   updateDisplay();
   renderClassement(); 
   renderTablesPlan();
+  if (selectedTournamentLoaded && resumeSelectedTournament) startTimer();
 });
 
 // Edition du titre

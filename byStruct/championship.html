@@ -71,6 +71,25 @@
         </form>
     </dialog>
 
+    <dialog id="new-tournament-dialog" aria-labelledby="new-tournament-title">
+        <div class="player-import-header">
+            <h2 id="new-tournament-title">Nouveau tournoi</h2>
+            <button type="button" class="player-import-close" onclick="closeNewTournamentDialog()" aria-label="Fermer">&times;</button>
+        </div>
+        <form id="new-tournament-form" class="player-import-panel" onsubmit="createChampionshipTournament(event)">
+            <label for="new-tournament-date">Date (JJ/MM)</label>
+            <input id="new-tournament-date" type="text" inputmode="numeric" pattern="(?:0[1-9]|[12][0-9]|3[01])/(?:0[1-9]|1[0-2])" placeholder="JJ/MM" required>
+            <label for="new-tournament-title-input">Titre</label>
+            <input id="new-tournament-title-input" type="text" required>
+            <label for="new-tournament-structure">Structure (JSON)</label>
+            <textarea id="new-tournament-structure" rows="7" required spellcheck="false"></textarea>
+            <label for="new-tournament-ptsladder">Barème de points (JSON)</label>
+            <textarea id="new-tournament-ptsladder" rows="5" required spellcheck="false"></textarea>
+            <p id="new-tournament-status" role="status" aria-live="polite"></p>
+            <button type="submit">Créer le tournoi</button>
+        </form>
+    </dialog>
+
     <dialog id="player-import-dialog" aria-labelledby="player-import-title">
         <div class="player-import-header">
             <h2 id="player-import-title">Importer des joueurs au championnat</h2>
